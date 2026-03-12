@@ -1,0 +1,7 @@
+# Eigensolver scaling: FREESTREAM_RECEPTIVITY
+# Nchi        Neta        Nchi*Neta       Language    Time [s]        
+  256         64          16384           MATLAB      6.277921        
+  512         128         65536           MATLAB      45.385973       
+  1024        256         262144          MATLAB      348.472843      
+  2048        512         1048576         MATLAB      2734.087942     
+  4096        1024        4194304         MATLAB      22232.374806 

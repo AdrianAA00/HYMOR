@@ -1,0 +1,12 @@
+# My cases
+cases_mine/
+
+# MATLAB files
+*.asv
+*myWorkspace.mat
+
+# Figures
+*_out.png
+*/hypersonic_entry_capsule/*.pdf
+*/hypersonic_blunt_cone/*.pdf
+*/hypersonic_cylinder/*.pdf

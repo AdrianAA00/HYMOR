@@ -1,0 +1,10 @@
+# Timing results - Julia
+# Grid (Nchi x Neta)    Elapsed time (s)
+Grid                      Elapsed_time_s
+100x100                   7.936587
+200x200                   41.721302
+400x400                   161.765184
+800x800                   652.195874
+1600x1600                 2609.943386
+3200x3200                 10420.274593
+6400x6400                 41932.237623

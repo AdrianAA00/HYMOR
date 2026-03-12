@@ -1,0 +1,7 @@
+# Eigensolver scaling: FREESTREAM_RECEPTIVITY
+# Nchi        Neta        Nchi*Neta       Language    Time [s]        
+  256         64          16384           Julia       5.190731        
+  512         128         65536           Julia       35.044312       
+  1024        256         262144          Julia       281.893860      
+  2048        512         1048576         Julia       2274.355547    
+  4096        1024        4194304         Julia       18041.356732 

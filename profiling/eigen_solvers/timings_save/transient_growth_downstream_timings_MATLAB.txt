@@ -1,0 +1,7 @@
+# Eigensolver scaling: TRANSIENT_GROWTH_DOWNSTREAM
+# Nchi        Neta        Nchi*Neta       Language    Time [s]        
+  256         64          16384           MATLAB      2.755879        
+  512         128         65536           MATLAB      18.226343       
+  1024        256         262144          MATLAB      138.616000      
+  2048        512         1048576         MATLAB      1045.357634     
+  4096        1024        4194304         MATLAB      9123.030636

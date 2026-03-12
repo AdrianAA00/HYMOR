@@ -1,0 +1,54 @@
+# ===================================================================
+# NON-EQUILIBRIUM MODEL COEFFICIENTS
+# ===================================================================
+# Planet: Earth
+# Gas Model: Chemical-Rotational-Translational-Vibrational-Electronic-Equilibrium
+# Mechanism: airNASA9ions.yaml
+# Temperature Range: 2000 - 11000 K
+# Density Range: 0.001 - 1 kg/m³
+#
+# Model: ln(tau*P^m) = ln(T) + a0 + a1/T + a2/T^2
+# where tau is the relaxation time (s), P is pressure (Pa), T is temperature (K)
+# ===================================================================
+
+# -------------------------------------------------------------------
+# PRESSURE EXPONENTS
+# -------------------------------------------------------------------
+1.550000  # m_gamma: Pressure exponent for gamma* relaxation
+1.550000  # m_cv: Pressure exponent for cv* relaxation
+
+# -------------------------------------------------------------------
+# LINEAR FIT COEFFICIENTS (Valid for T > 3000 K)
+# Model: ln(tau*P^m) = ln(T) + a0 + a1/T
+# -------------------------------------------------------------------
+
+# Gamma* relaxation (linear fit):
+-7.0028650400e+00  # a0_gamma_linear
+2.8994862698e+04  # a1_gamma_linear (K)
+9.8682300118e-01  # R2_gamma_linear
+
+# cv* relaxation (linear fit):
+-6.7564775106e+00  # a0_cv_linear
+2.8133143357e+04  # a1_cv_linear (K)
+9.8776937610e-01  # R2_cv_linear
+
+# -------------------------------------------------------------------
+# QUADRATIC FIT COEFFICIENTS (Valid for full temperature range)
+# Model: ln(tau*P^m) = ln(T) + a0 + a1/T + a2/T^2
+# -------------------------------------------------------------------
+
+# Gamma* relaxation (quadratic fit):
+-8.4076542196e+00  # a0_gamma_quadratic
+4.5670899796e+04  # a1_gamma_quadratic (K)
+-4.1547934627e+07  # a2_gamma_quadratic (K^2)
+9.7862644295e-01  # R2_gamma_quadratic
+
+# cv* relaxation (quadratic fit):
+-8.1659922663e+00  # a0_cv_quadratic
+4.4700025508e+04  # a1_cv_quadratic (K)
+-4.0704561338e+07  # a2_cv_quadratic (K^2)
+9.8053376603e-01  # R2_cv_quadratic
+
+# ===================================================================
+# END OF FILE
+# ===================================================================

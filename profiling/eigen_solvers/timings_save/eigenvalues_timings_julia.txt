@@ -1,0 +1,7 @@
+# Eigensolver scaling: EIGENVALUES
+# Nchi        Neta        Nchi*Neta       Language    Time [s]        
+  256         64          16384           Julia       6.817321        
+  512         128         65536           Julia       15.333618       
+  1024        256         262144          Julia       156.199575      
+  2048        512         1048576         Julia       1224.596624     
+  4096        1024        4194304         Julia       9934.732472   

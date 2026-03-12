@@ -1,0 +1,7 @@
+# Eigensolver scaling: EIGENVALUES
+# Nchi        Neta        Nchi*Neta       Language    Time [s]        
+  256         64          16384           MATLAB      6.310788        
+  512         128         65536           MATLAB      23.168185       
+  1024        256         262144          MATLAB      186.222739      
+  2048        512         1048576         MATLAB      1456.357434     
+  4096        1024        4194304         MATLAB      11842.456227   

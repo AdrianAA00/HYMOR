@@ -1,0 +1,7 @@
+# Eigensolver scaling: TRANSIENT_GROWTH_DOWNSTREAM
+# Nchi        Neta        Nchi*Neta       Language    Time [s]        
+  256         64          16384           Julia       2.407353        
+  512         128         65536           Julia       17.586796       
+  1024        256         262144          Julia       133.286683      
+  2048        512         1048576         Julia       998.904293     
+  4096        1024        4194304         Julia       8424.247824 

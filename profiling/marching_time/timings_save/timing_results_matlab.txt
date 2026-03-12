@@ -1,0 +1,10 @@
+# Timing results - MATLAB
+# Grid (Nchi x Neta)    Elapsed time (s)
+Grid                      Elapsed_time_s
+100x100                   11.165405
+200x200                   52.353156
+400x400                   143.606824
+800x800                   580.648823
+1600x1600                 2310.243121
+3200x3200                 9265.127927
+6400x6400                 37234.904545
