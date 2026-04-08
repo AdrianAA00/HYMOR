@@ -40,6 +40,14 @@ function s = ADVECT_FLOW_EXPLICIT(s, chemistry)
     s = CFL_TIMESTEP(s);
     dt = s.time_integration.dt;
 
+    % Store to compute later on residual
+    if s.time_integration.plot_residual
+        s_save.rho = s.var.rho;
+        s_save.rho_u = s.var.rho_u;
+        s_save.rho_v = s.var.rho_v;
+        s_save.rho_E = s.var.rho_E;
+    end
+
     %% Stage 1 (k1)
     temp = PDE(solution_0, chemistry);
     s = INTEGRATION(s, temp, dt / 6);
@@ -73,4 +81,28 @@ function s = ADVECT_FLOW_EXPLICIT(s, chemistry)
     s.time_integration.t    = s.time_integration.t + s.time_integration.dt;
     s.time_integration.iter = s.time_integration.iter + 1;
 
+    %% Compute residual
+    if s.time_integration.plot_residual
+        s.time_integration.residual = RESIDUAL(s,s_save);
+    end
+
+end
+
+function residual = RESIDUAL(s,s_save)
+    mask = logical(s.shock.flow_cells);
+    
+    delta_rho   = s.var.rho(2:end-1,2:end-1)   - s_save.rho(2:end-1,2:end-1);
+    delta_rho_u = s.var.rho_u(2:end-1,2:end-1) - s_save.rho_u(2:end-1,2:end-1);
+    delta_rho_v = s.var.rho_v(2:end-1,2:end-1) - s_save.rho_v(2:end-1,2:end-1);
+    delta_rho_E = s.var.rho_E(2:end-1,2:end-1) - s_save.rho_E(2:end-1,2:end-1);
+
+    var_rho   = s.var.rho(2:end-1,2:end-1);
+    var_rho_u = s.var.rho_u(2:end-1,2:end-1);
+    var_rho_v = s.var.rho_v(2:end-1,2:end-1);
+    var_rho_E = s.var.rho_E(2:end-1,2:end-1);
+
+    residual.rho   = rms(delta_rho(mask))   / rms(var_rho(mask));
+    residual.rho_u = rms(delta_rho_u(mask)) / rms(var_rho_u(mask));
+    residual.rho_v = rms(delta_rho_v(mask)) / rms(var_rho_v(mask));
+    residual.rho_E = rms(delta_rho_E(mask)) / rms(var_rho_E(mask));
 end
