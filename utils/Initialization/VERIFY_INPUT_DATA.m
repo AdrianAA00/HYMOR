@@ -232,6 +232,9 @@ function s = VERIFY_INPUT_DATA(s)
     assert(isnumeric(s.time_integration.dt) && s.time_integration.dt > 0, 'time_integration.dt must be positive numeric');
     assert(isfield(s.time_integration, 'max_dt'), 'Missing field: time_integration.max_dt');
     assert(isnumeric(s.time_integration.max_dt) && s.time_integration.max_dt > 0, 'time_integration.max_dt must be positive numeric');
+    if ~isfield(s.time_integration, 'plot_residual')
+        s.time_integration.plot_residual = false;
+    else
 
     % 9. Numerical Dissipation
     if ~isfield(s, 'numerical_dissipation')

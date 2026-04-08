@@ -91,6 +91,7 @@ solution.time_integration.time_integrator   = "Explicit_RK4"; % Scheme: "Explici
 solution.time_integration.CFL               = 2;             % CFL number for adaptive time stepping
 solution.time_integration.dt                = 0.000001;      % Initial time step [s]
 solution.time_integration.max_dt            = 0.3;           % Maximum allowable time step [s]
+solution.time_integration.plot_residual     = false;         % Plot residual convergence of time integration
 
 %% Shock fitting
 solution.shock.enabled                  = true;         % Enable shock fitting

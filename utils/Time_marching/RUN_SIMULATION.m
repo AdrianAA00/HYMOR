@@ -72,6 +72,11 @@ function s = RUN_SIMULATION(s, solution_base, chemistry)
         if mod(s.time_integration.iter, 10) == 0
             fprintf("Iteration = %8i, Timestep = %.5f, Time = %.5f", ...
                     s.time_integration.iter, s.time_integration.dt, s.time_integration.t);
+            if s.time_integration.plot_residual
+                fprintf("\nResidual: rho = %.3e, rho*u = %.3e, rho*v = %.3e, rho*E = %.3e\n", ...
+                        s.time_integration.residual.rho, s.time_integration.residual.rho_u, s.time_integration.residual.rho_v, s.time_integration.residual.rho_E);
+            end
+
             if isfield(s.time_integration, 'time_integrator') && s.time_integration.time_integrator == "Implicit_Euler"
                 if isfield(s, 'count_implicit_iterations')
                     fprintf(", Implicit iterations = %i\n", s.count_implicit_iterations);
@@ -113,13 +118,13 @@ function s = RUN_SIMULATION(s, solution_base, chemistry)
     fprintf("Final time = ")
     fprintf('%.3f \n', s.time_integration.t)
 
-    if s.shock.enabled
-        s = UPDATE_FLOW_CELLS(s, chemistry);
-        s = UPDATE_SHOCK_BC(s, chemistry);
-    end
-    s = UPDATE_THERMODYNAMIC_PROPERTIES(s, chemistry);
-    s = UPDATE_CHEMISTRY_EQUILIBRIUM(s, chemistry);
-    s = UPDATE_SOUND_SPEED(s, chemistry);
-    s = APPLY_BOUNDARY_CONDITIONS(s, chemistry);
+    % if s.shock.enabled
+    %     s = UPDATE_FLOW_CELLS(s, chemistry);
+    %     s = UPDATE_SHOCK_BC(s, chemistry);
+    % end
+    % s = UPDATE_THERMODYNAMIC_PROPERTIES(s, chemistry);
+    % s = UPDATE_CHEMISTRY_EQUILIBRIUM(s, chemistry);
+    % s = UPDATE_SOUND_SPEED(s, chemistry);
+    % s = APPLY_BOUNDARY_CONDITIONS(s, chemistry);
     
 end
