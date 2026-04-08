@@ -5,6 +5,9 @@ cases_mine/
 *.asv
 *myWorkspace.mat
 
+# Other/system files
+.DS_Store
+
 # Figures
 *_out.png
 */hypersonic_entry_capsule/*.pdf
