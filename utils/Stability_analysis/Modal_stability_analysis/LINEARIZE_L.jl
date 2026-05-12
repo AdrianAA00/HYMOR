@@ -39,6 +39,16 @@ function LINEARIZE_L(s::Dict{String,Any}, chemistry::Dict{String,Any})
     println("      Linearize L       ")
     println("------------------------")
 
+    # Make sure BC applied
+    if s["shock"]["enabled"]
+        s = UPDATE_FLOW_CELLS(s, chemistry)
+        s = UPDATE_SHOCK_BC(s, chemistry)
+    end
+    s = UPDATE_THERMODYNAMIC_PROPERTIES(s, chemistry)
+    s = UPDATE_CHEMISTRY_EQUILIBRIUM(s, chemistry)
+    s = UPDATE_SOUND_SPEED(s, chemistry)
+    s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
+
     ## Prepare base flow
     if s["shock"]["enabled"]
         s = CHECK_MESH_FOLLOWS_SHOCK(s, chemistry)

@@ -69,8 +69,8 @@ function UPDATE_FIELD_UPSTREAM(s::Dict{String, Any})
     two_pi_kx = 2.0 * pi * k_x
     u_x_t = u_x * t
     u_y_t = u_y * t
-    @inbounds perturbation = @. cos(two_pi_ky * (x_Ext - u_x_t)) *
-                                sin(two_pi_kx * (y_Ext - u_y_t))
+    @inbounds perturbation = @. cos(two_pi_ky * (y_Ext - u_y_t)) *
+                                sin(two_pi_kx * (x_Ext - u_x_t))
 
     if haskey(s, "rho_0_upstream_p")
         ## Prescribed perturbed upstream state
