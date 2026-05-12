@@ -30,7 +30,7 @@ function s = UPDATE_SHOCK_JUMP_PROPERTIES(s, chemistry)
 %
 % Part of: Hypersonics Stability MATLAB Solver - Shock Fitting Module
 
-    s = UPDATE_SHOCK_JUMP_PROPERTIES_RIEMANN(s, chemistry);
+    s = UPDATE_SHOCK_JUMP_PROPERTIES_PRESSURE_3(s, chemistry);
 end
 
 %% ========================================================================
