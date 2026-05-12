@@ -31,7 +31,8 @@ function UPDATE_SOUND_SPEED(s::Dict{String, Any}, chemistry::Dict{String, Any})
     else
         p          = var["p"]::Matrix{Float64}
         gamma_star = var["gamma_star"]::Matrix{Float64}
-        var["a"] = @. sqrt(gamma_star * p / rho) / vel_factor
+        # p and rho are already non-dim, so sqrt(gamma*p/rho) gives a/U directly
+        var["a"] = @. sqrt(gamma_star * p / rho)
     end
 
     return s

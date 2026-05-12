@@ -41,5 +41,9 @@ function MOVE_SHOCK(s::Dict{String, Any}, dsolution_dt::Dict{String, Any}, w::Fl
     @inbounds @. pts_x = pts_x + spd_x * w_relax
     @inbounds @. pts_y = pts_y + spd_y * w_relax
 
+    if s["boundary_conditions"]["boundary_chi0"]["name"] == "symmetry"
+        pts_x[1, 1] = pts_x[2, 1]  # Symmetry condition
+    end
+
     return s
 end

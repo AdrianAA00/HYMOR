@@ -31,4 +31,7 @@ function s = MOVE_SHOCK(s, dsolution_dt, w)
         + dsolution_dt.shock.speed_x * w * s.shock.relaxation;
     s.shock.points_y = s.shock.points_y ...
         + dsolution_dt.shock.speed_y * w * s.shock.relaxation;
+    if strcmp(s.boundary_conditions.boundary_chi0.name, 'symmetry')
+         s.shock.points_x(1, 1) = s.shock.points_x(2, 1);  % Symmetry condition
+    end
 end

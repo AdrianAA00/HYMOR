@@ -72,8 +72,8 @@ function s = UPDATE_FIELD_UPSTREAM(s)
         y_up = s.mesh.y_Ext(upstream_mask);
         
         % OPTIMIZATION 3: Compute expensive trig functions ONLY on the upstream vector
-        perturbation_up = cos(2 * pi * s.freestream.disturbance.k_y * (x_up - u_x * s.time_integration.t)) ...
-                       .* sin(2 * pi * s.freestream.disturbance.k_x * (y_up - u_y * s.time_integration.t));
+        perturbation_up = cos(2 * pi * s.freestream.disturbance.k_y * (y_up - u_y * s.time_integration.t)) ...
+                       .* sin(2 * pi * s.freestream.disturbance.k_x * (x_up - u_x * s.time_integration.t));
                        
         % Apply to the flow field arrays
         s.var.rho(upstream_mask)   = s.freestream.rho_0   + perturbation_up * s.freestream.disturbance.amplitude(1);

@@ -15,8 +15,9 @@ function T_ref = GET_T_REF(s)
 %                    .shock.flow_cells    - Active-cell mask
 %                    .mesh.Nchi           - Number of streamwise cells
 %                    .mesh.bt_area        - Cell boundary areas
-%                    .mesh.bt_y_normal    - Wall-normal component of boundary normals
+%                    .mesh.bt_x_normal, .mesh.bt_y_normal - Boundary normal components
 %                    .shock.cell_indices  - Indices of shocked cells
+%                    .freestream.rho_u_0, .freestream.rho_v_0 - Non-dim freestream momentum
 %
 %   Outputs:
 %       T_ref - Reference advection time (mass_downstream / inflow_mass_flux)
@@ -30,9 +31,13 @@ function T_ref = GET_T_REF(s)
     mass_dowstream = sum(rho .* flow_cells .* volume, "all");
 
     %% Compute inflow mass flux through the shock
+    % Project freestream momentum onto each shock-face normal (generic for any U, V)
     inflow_mass_flux = 0;
     for i = 1:s.mesh.Nchi
-        inflow_mass_flux = inflow_mass_flux + s.mesh.bt_area(i, s.shock.cell_indices(i, 1)) * s.mesh.bt_y_normal(i, s.shock.cell_indices(i, 1));
+        j = s.shock.cell_indices(i, 1);
+        n_dot_rho_v = s.freestream.rho_u_0 * s.mesh.bt_x_normal(i, j) ...
+                    + s.freestream.rho_v_0 * s.mesh.bt_y_normal(i, j);
+        inflow_mass_flux = inflow_mass_flux + s.mesh.bt_area(i, j) * abs(n_dot_rho_v);
     end
 
     %% Reference time = mass / flux

@@ -105,7 +105,7 @@ function UPDATE_SHOCK_UPSTREAM(s::Dict{String, Any})
     ## Apply symmetry boundary conditions for axisymmetric flows
     pde_dim = s["PDE_dimension"]::String
     if pde_dim == "3D-axisymmetric"
-        @inbounds rho_v[end, 1] = 0
+        @inbounds rho_v[1, 1] = 0
     end
 
     return rho, rho_u, rho_v, rho_E

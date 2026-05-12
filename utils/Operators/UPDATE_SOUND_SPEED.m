@@ -33,10 +33,11 @@ function s = UPDATE_SOUND_SPEED(s, chemistry)
     rho = s.var.rho;
     e = (s.var.rho_E - (s.var.rho_u.^2 + s.var.rho_v.^2) ./ rho / 2) ./ rho;
 
-    %% Update sound speed
+    %% Update sound speed (always non-dimensional, a/U)
     if s.chemistry.is_chemistry_enabled
         s.var.a = chemistry.eval_a(s.freestream.rho_factor * rho, s.freestream.energy_factor * e) / s.freestream.velocity_factor;
     else
-        s.var.a = sqrt(s.var.gamma_star .* s.var.p ./ s.var.rho) / s.freestream.velocity_factor;
+        % p and rho are already non-dim, so sqrt(gamma*p/rho) gives a/U directly
+        s.var.a = sqrt(s.var.gamma_star .* s.var.p ./ s.var.rho);
     end
 end

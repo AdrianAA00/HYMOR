@@ -67,6 +67,6 @@ function [rho, rho_u, rho_v, rho_E] = UPDATE_SHOCK_UPSTREAM(s)
 
     %% Apply symmetry boundary conditions for axisymmetric flows
     if s.PDE_dimension == "3D-axisymmetric"
-        rho_v(end, 1) = 0;
+        rho_v(1, 1) = 0;
     end
 end

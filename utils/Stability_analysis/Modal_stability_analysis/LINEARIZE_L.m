@@ -36,6 +36,16 @@ function [s, L] = LINEARIZE_L(s, chemistry)
     disp("      Linearize L       ")
     disp("------------------------")
 
+    % Make sure BC applied
+    if s.shock.enabled
+        s = UPDATE_FLOW_CELLS(s, chemistry);
+        s = UPDATE_SHOCK_BC(s, chemistry);
+    end
+    s = UPDATE_THERMODYNAMIC_PROPERTIES(s, chemistry);
+    s = UPDATE_CHEMISTRY_EQUILIBRIUM(s, chemistry);
+    s = UPDATE_SOUND_SPEED(s, chemistry);
+    s = APPLY_BOUNDARY_CONDITIONS(s, chemistry);
+
     %% Prepare base flow
     if s.shock.enabled
         s = CHECK_MESH_FOLLOWS_SHOCK(s, chemistry);

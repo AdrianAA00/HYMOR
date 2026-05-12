@@ -25,8 +25,8 @@ function s = UPDATE_FLOW_CELLS(s, chemistry)
 
     if s.shock.enabled
         s = DETECT_CELLS_SHOCKED(s);
-        s = EXTRAPOLATE_CELLS_SHOCK(s);
         s = UPDATE_FIELD_UPSTREAM(s);
+        s = EXTRAPOLATE_CELLS_SHOCK(s);
         s = UPDATE_CHEMISTRY_EQUILIBRIUM(s, chemistry);
         s = UPDATE_THERMODYNAMIC_PROPERTIES(s, chemistry);
         s = UPDATE_SOUND_SPEED(s, chemistry);

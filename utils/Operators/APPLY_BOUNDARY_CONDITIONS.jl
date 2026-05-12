@@ -99,6 +99,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views @. rho_u_arr[1,:] = 2 * rho_u_arr[2,:] - rho_u_arr[3,:]
         @views @. rho_v_arr[1,:] = 2 * rho_v_arr[2,:] - rho_v_arr[3,:]
         @views p_arr[1,:] .= p_arr[2,:]  # zero pressure gradient
+        @views T_arr[1,:] .= T_arr[2,:]  # zero heat flux
 
         if !chem_eq
             @views gamma_star_arr[1,:] .= gamma_star_arr[2,:]
@@ -111,6 +112,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views @. rho_u_arr[1,:] = 2 * rho_u_arr[2,:] - rho_u_arr[3,:]
         @views @. rho_v_arr[1,:] = 2 * rho_v_arr[2,:] - rho_v_arr[3,:]
         @views @. p_arr[1,:] = 2 * p_arr[2,:] - p_arr[3,:]
+        @views T_arr[1,:] .= T_arr[2,:]  # zero heat flux
 
         if !chem_eq
             @views @. gamma_star_arr[1,:] = 2 * gamma_star_arr[2,:] - gamma_star_arr[3,:]
@@ -123,6 +125,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views rho[1,:] .= rho[2,:]
         @views rho_E_arr[1,:] .= rho_E_arr[2,:]
         @views p_arr[1,:] .= p_arr[2,:]
+        @views T_arr[1,:] .= T_arr[2,:]  # zero heat flux
 
         if !chem_eq
             @views gamma_star_arr[1,:] .= gamma_star_arr[2,:]
@@ -137,6 +140,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views @. rho_v_arr[1,:] = 2 * rho_v_arr[2,:] - rho_v_arr[3,:]
         @views @. rho_E_arr[1,:] = 2 * rho_E_arr[2,:] - rho_E_arr[3,:]
         @views @. p_arr[1,:] = 2 * p_arr[2,:] - p_arr[3,:]
+        @views T_arr[1,:] .= T_arr[2,:]  # zero heat flux
 
         # Sound speed and density at first interior cell
         a_arr = var["a"]::Matrix{Float64}
@@ -286,6 +290,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views @. rho_u_arr[end,:] = 2 * rho_u_arr[end-1,:] - rho_u_arr[end-2,:]
         @views @. rho_v_arr[end,:] = 2 * rho_v_arr[end-1,:] - rho_v_arr[end-2,:]
         @views @. p_arr[end,:] = 2 * p_arr[end-1,:] - p_arr[end-2,:]
+        @views T_arr[end,:] .= T_arr[end-1,:]  # zero heat flux
 
         if !chem_eq
             @views @. gamma_star_arr[end,:] = 2 * gamma_star_arr[end-1,:] - gamma_star_arr[end-2,:]
@@ -298,6 +303,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views rho[end,:] .= rho[end-1,:]
         @views rho_E_arr[end,:] .= rho_E_arr[end-1,:]
         @views p_arr[end,:] .= p_arr[end-1,:]
+        @views T_arr[end,:] .= T_arr[end-1,:]  # zero heat flux
 
         if !chem_eq
             @views gamma_star_arr[end,:] .= gamma_star_arr[end-1,:]
@@ -310,6 +316,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views @. rho[end,:] = 2 * rho[end-1,:] - rho[end-2,:]
         @views @. rho_E_arr[end,:] = 2 * rho_E_arr[end-1,:] - rho_E_arr[end-2,:]
         @views p_arr[end,:] .= p_arr[end-1,:]  # zero pressure gradient
+        @views T_arr[end,:] .= T_arr[end-1,:]  # zero heat flux
 
         if !chem_eq
             @views gamma_star_arr[end,:] .= gamma_star_arr[end-1,:]
@@ -324,6 +331,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views @. rho_v_arr[end,:] = 2 * rho_v_arr[end-1,:] - rho_v_arr[end-2,:]
         @views @. rho_E_arr[end,:] = 2 * rho_E_arr[end-1,:] - rho_E_arr[end-2,:]
         @views @. p_arr[end,:] = 2 * p_arr[end-1,:] - p_arr[end-2,:]
+        @views T_arr[end,:] .= T_arr[end-1,:]  # zero heat flux
 
         # Sound speed and density at last interior cell
         a_arr = var["a"]::Matrix{Float64}
@@ -471,6 +479,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views @. rho_u_arr[:,1] = 2 * rho_u_arr[:,2] - rho_u_arr[:,3]
         @views @. rho_v_arr[:,1] = 2 * rho_v_arr[:,2] - rho_v_arr[:,3]
         @views @. p_arr[:,1] = 2 * p_arr[:,2] - p_arr[:,3]
+        @views T_arr[:,1] .= T_arr[:,2]  # zero heat flux
 
         if !chem_eq
             @views @. gamma_star_arr[:,1] = 2 * gamma_star_arr[:,2] - gamma_star_arr[:,3]
@@ -483,6 +492,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views rho_v_arr[:,1] .= rho_v_arr[:,2]
         @views rho_E_arr[:,1] .= rho_E_arr[:,2]
         @views p_arr[:,1] .= p_arr[:,2]
+        @views T_arr[:,1] .= T_arr[:,2]  # zero heat flux
 
         if !chem_eq
             @views gamma_star_arr[:,1] .= gamma_star_arr[:,2]
@@ -495,6 +505,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views @. rho_u_arr[:,1] = 2 * rho_u_arr[:,2] - rho_u_arr[:,3]
         @views @. rho_v_arr[:,1] = 2 * rho_v_arr[:,2] - rho_v_arr[:,3]
         @views p_arr[:,1] .= p_arr[:,2]  # zero pressure gradient
+        @views T_arr[:,1] .= T_arr[:,2]  # zero heat flux
 
         if !chem_eq
             @views gamma_star_arr[:,1] .= gamma_star_arr[:,2]
@@ -509,6 +520,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views @. rho_v_arr[:,1] = 2 * rho_v_arr[:,2] - rho_v_arr[:,3]
         @views @. rho_E_arr[:,1] = 2 * rho_E_arr[:,2] - rho_E_arr[:,3]
         @views @. p_arr[:,1] = 2 * p_arr[:,2] - p_arr[:,3]
+        @views T_arr[:,1] .= T_arr[:,2]  # zero heat flux
 
         # Sound speed and density at first interior cell
         a_arr = var["a"]::Matrix{Float64}
@@ -658,6 +670,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views @. rho_u_arr[:,end] = 2 * rho_u_arr[:,end-1] - rho_u_arr[:,end-2]
         @views @. rho_v_arr[:,end] = 2 * rho_v_arr[:,end-1] - rho_v_arr[:,end-2]
         @views @. p_arr[:,end] = 2 * p_arr[:,end-1] - p_arr[:,end-2]
+        @views T_arr[:,end] .= T_arr[:,end-1]  # zero heat flux
 
         if !chem_eq
             @views @. gamma_star_arr[:,end] = 2 * gamma_star_arr[:,end-1] - gamma_star_arr[:,end-2]
@@ -670,6 +683,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views rho_v_arr[:,end] .= rho_v_arr[:,end-1]
         @views rho_E_arr[:,end] .= rho_E_arr[:,end-1]
         @views p_arr[:,end] .= p_arr[:,end-1]
+        @views T_arr[:,end] .= T_arr[:,end-1]  # zero heat flux
 
         if !chem_eq
             @views gamma_star_arr[:,end] .= gamma_star_arr[:,end-1]
@@ -682,6 +696,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views @. rho_u_arr[:,end] = 2 * rho_u_arr[:,end-1] - rho_u_arr[:,end-2]
         @views @. rho_v_arr[:,end] = 2 * rho_v_arr[:,end-1] - rho_v_arr[:,end-2]
         @views p_arr[:,end] .= p_arr[:,end-1]  # zero pressure gradient
+        @views T_arr[:,end] .= T_arr[:,end-1]  # zero heat flux
 
         if !chem_eq
             @views gamma_star_arr[:,end] .= gamma_star_arr[:,end-1]
@@ -696,6 +711,7 @@ function APPLY_BOUNDARY_CONDITIONS(s::Dict{String, Any}, chemistry::Dict{String,
         @views @. rho_v_arr[:,end] = 2 * rho_v_arr[:,end-1] - rho_v_arr[:,end-2]
         @views @. rho_E_arr[:,end] = 2 * rho_E_arr[:,end-1] - rho_E_arr[:,end-2]
         @views @. p_arr[:,end] = 2 * p_arr[:,end-1] - p_arr[:,end-2]
+        @views T_arr[:,end] .= T_arr[:,end-1]  # zero heat flux
 
         # Sound speed and density at last interior cell
         a_arr = var["a"]::Matrix{Float64}

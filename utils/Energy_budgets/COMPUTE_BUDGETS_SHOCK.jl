@@ -89,8 +89,15 @@ function COMPUTE_BUDGETS_SHOCK(V, w_infty, s, chemistry)
     lin_idx_shock     = [LinearIndices(s["mesh"]["x"])[valid_ix[k], sc_idy[k] - 1] for k in 1:Nx]
     lin_idx_shock_Ext = [LinearIndices(s["mesh"]["x_Ext"])[valid_ix[k] + 1, sc_idy[k]] for k in 1:Nx]
 
-    # Effective shock surface area
-    shock_area_effective = s["mesh"]["bt_area"][lin_idx_shock] .* s["mesh"]["bt_y_normal"][lin_idx_shock]
+    # Freestream unit direction (generic, works for any U, V freestream)
+    V_inf_mag = sqrt(s["freestream"]["rho_u_0"]^2 + s["freestream"]["rho_v_0"]^2)
+    u_hat = s["freestream"]["rho_u_0"] / V_inf_mag
+    v_hat = s["freestream"]["rho_v_0"] / V_inf_mag
+
+    # Effective shock surface area = bt_area projected onto freestream direction
+    bt_x_n = s["mesh"]["bt_x_normal"][lin_idx_shock]
+    bt_y_n = s["mesh"]["bt_y_normal"][lin_idx_shock]
+    shock_area_effective = s["mesh"]["bt_area"][lin_idx_shock] .* abs.(bt_x_n .* u_hat .+ bt_y_n .* v_hat)
 
     # Post-shock base-flow quantities
     rho_2        = s["var"]["rho"][lin_idx_shock_Ext]
@@ -112,12 +119,15 @@ function COMPUTE_BUDGETS_SHOCK(V, w_infty, s, chemistry)
     u_pert_norm_shock = -pert_u .* sin.(s["shock"]["beta"][valid_ix, 1]) .+
                          pert_v .* cos.(s["shock"]["beta"][valid_ix, 1])
 
+    # Post-shock velocity projected onto shock-face normal (advection speed)
+    u_advect_2 = abs.((rho_u_2 .* bt_x_n .+ rho_v_2 .* bt_y_n) ./ rho_2)
+
     ## Integrate energy fluxes over shock surface
     budgets_shock = Dict{String,Any}()
-    budgets_shock["adv_acoustic"] = sum(E_2["acoustic"] .* abs.(rho_v_2 ./ rho_2) .* shock_area_effective)
-    budgets_shock["adv_kinetic"]  = sum(E_2["kinetic"]  .* abs.(rho_v_2 ./ rho_2) .* shock_area_effective)
+    budgets_shock["adv_acoustic"] = sum(E_2["acoustic"] .* u_advect_2 .* shock_area_effective)
+    budgets_shock["adv_kinetic"]  = sum(E_2["kinetic"]  .* u_advect_2 .* shock_area_effective)
     budgets_shock["work_kinetic"] = -sum(pert_p .* u_pert_norm_shock .* shock_area_effective)
-    budgets_shock["adv_entropic"] = sum(E_2["entropic"] .* abs.(rho_v_2 ./ rho_2) .* shock_area_effective)
+    budgets_shock["adv_entropic"] = sum(E_2["entropic"] .* u_advect_2 .* shock_area_effective)
 
     return budgets_shock
 end

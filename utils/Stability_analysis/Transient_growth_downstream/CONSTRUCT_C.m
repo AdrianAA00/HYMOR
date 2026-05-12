@@ -44,6 +44,10 @@ function x = CONSTRUCT_C(x, A_dt, At_dt, C_no_exp, n_t, freestream_disturbances,
         [x_buf] = EXPONENTIAL(x_buf, A_dt, At_dt, C_no_exp, n_t, vout_buf, term_buf);
         x = x_buf;
     end
+
+    if freestream_disturbances
+        x(1:N_set_0, 1) = 0;
+    end
 end
 
 

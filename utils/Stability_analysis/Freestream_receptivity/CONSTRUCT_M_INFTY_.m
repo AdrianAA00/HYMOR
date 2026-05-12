@@ -83,8 +83,15 @@ function M_infty = CONSTRUCT_M_INFTY(s, norms, T, scaling_non_temporal)
     total_post_shock_volume = 0;
     volume_advect = zeros(Nx, 1);
 
+    % Freestream unit direction (generic, works for any U, V freestream)
+    V_inf_mag = sqrt(s.freestream.rho_u_0^2 + s.freestream.rho_v_0^2);
+    u_hat = s.freestream.rho_u_0 / V_inf_mag;
+    v_hat = s.freestream.rho_v_0 / V_inf_mag;
+
     for i = 1:Nx
-        shock_arc_length(i) = s.mesh.bt_area(i, s.shock.cell_indices(i, 1)) * s.mesh.bt_y_normal(i, s.shock.cell_indices(i, 1));
+        j = s.shock.cell_indices(i, 1);
+        proj = s.mesh.bt_x_normal(i, j) * u_hat + s.mesh.bt_y_normal(i, j) * v_hat;
+        shock_arc_length(i) = s.mesh.bt_area(i, j) * abs(proj);
         total_arc_length = total_arc_length + shock_arc_length(i);
     end
     for i = 1:Nx

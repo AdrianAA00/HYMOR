@@ -51,6 +51,10 @@ function CONSTRUCT_C(x, A_dt, At_dt, C_no_exp, n_t, freestream_disturbances::Boo
         x = copy(x_buf)
     end
 
+    if freestream_disturbances
+        x[1:N_set_0] .= 0
+    end
+
     return x
 end
 

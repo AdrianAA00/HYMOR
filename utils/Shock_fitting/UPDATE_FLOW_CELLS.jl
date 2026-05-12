@@ -26,8 +26,8 @@ function UPDATE_FLOW_CELLS(s::Dict{String, Any}, chemistry::Dict{String, Any})
     shock = s["shock"]::Dict{String, Any}
     if shock["enabled"]
         s = DETECT_CELLS_SHOCKED(s)
-        s = EXTRAPOLATE_CELLS_SHOCK(s)
         s = UPDATE_FIELD_UPSTREAM(s)
+        s = EXTRAPOLATE_CELLS_SHOCK(s)
         s = UPDATE_CHEMISTRY_EQUILIBRIUM(s, chemistry)
         s = UPDATE_THERMODYNAMIC_PROPERTIES(s, chemistry)
         s = UPDATE_SOUND_SPEED(s, chemistry)
