@@ -109,6 +109,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho_u(1,:) = 2 * s.var.rho_u(2,:) - s.var.rho_u(3,:);
             s.var.rho_v(1,:) = 2 * s.var.rho_v(2,:) - s.var.rho_v(3,:);
             s.var.p(1,:) = s.var.p(2,:); % zero pressure gradient
+            s.var.T(1,:) = s.var.T(2,:); % zero heat flux
 
             if ~s.chemistry.chemical_equilibrium
                 s.var.gamma_star(1,:) = s.var.gamma_star(2,:);
@@ -121,6 +122,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho_u(1,:) = 2 * s.var.rho_u(2,:) - s.var.rho_u(3,:);
             s.var.rho_v(1,:) = 2 * s.var.rho_v(2,:) - s.var.rho_v(3,:);
             s.var.p(1,:) = 2 * s.var.p(2,:) - s.var.p(3,:);
+            s.var.T(1,:) = s.var.T(2,:); % zero heat flux
 
             if ~s.chemistry.chemical_equilibrium
                 s.var.gamma_star(1,:) = 2 * s.var.gamma_star(2,:) - s.var.gamma_star(3,:);
@@ -133,6 +135,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho(1,:) = s.var.rho(2,:);
             s.var.rho_E(1,:) = s.var.rho_E(2,:);
             s.var.p(1,:) = s.var.p(2,:);
+            s.var.T(1,:) = s.var.T(2,:); % zero heat flux
 
             if ~s.chemistry.chemical_equilibrium
                 s.var.gamma_star(1,:) = s.var.gamma_star(2,:);
@@ -147,6 +150,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho_v(1,:) = 2 * s.var.rho_v(2,:) - s.var.rho_v(3,:);
             s.var.rho_E(1,:) = 2 * s.var.rho_E(2,:) - s.var.rho_E(3,:);
             s.var.p(1,:) = 2 * s.var.p(2,:) - s.var.p(3,:);
+            s.var.T(1,:) = s.var.T(2,:); % zero heat flux
 
             % Sound speed and density at first interior cell
             a = s.var.a(2,2:end-1);
@@ -278,6 +282,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho_u(end,:) = 2 * s.var.rho_u(end-1,:) - s.var.rho_u(end-2,:);
             s.var.rho_v(end,:) = 2 * s.var.rho_v(end-1,:) - s.var.rho_v(end-2,:);
             s.var.p(end,:) = 2 * s.var.p(end-1,:) - s.var.p(end-2,:);
+            s.var.T(end,:) = s.var.T(end-1,:); % zero heat flux
 
             if ~s.chemistry.chemical_equilibrium
                 s.var.gamma_star(end,:) = 2 * s.var.gamma_star(end-1,:) - s.var.gamma_star(end-2,:);
@@ -290,6 +295,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho(end,:) = s.var.rho(end-1,:);
             s.var.rho_E(end,:) = s.var.rho_E(end-1,:);
             s.var.p(end,:) = s.var.p(end-1,:);
+            s.var.T(end,:) = s.var.T(end-1,:); % zero heat flux
 
             if ~s.chemistry.chemical_equilibrium
                 s.var.gamma_star(end,:) = s.var.gamma_star(end-1,:);
@@ -302,6 +308,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho(end,:) = 2 * s.var.rho(end-1,:) - s.var.rho(end-2,:);
             s.var.rho_E(end,:) = 2 * s.var.rho_E(end-1,:) - s.var.rho_E(end-2,:);
             s.var.p(end,:) = s.var.p(end-1,:); % zero pressure gradient
+            s.var.T(end,:) = s.var.T(end-1,:); % zero heat flux
 
             if ~s.chemistry.chemical_equilibrium
                 s.var.gamma_star(end,:) = s.var.gamma_star(end-1,:);
@@ -316,6 +323,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho_v(end,:) = 2 * s.var.rho_v(end-1,:) - s.var.rho_v(end-2,:);
             s.var.rho_E(end,:) = 2 * s.var.rho_E(end-1,:) - s.var.rho_E(end-2,:);
             s.var.p(end,:) = 2 * s.var.p(end-1,:) - s.var.p(end-2,:);
+            s.var.T(end,:) = s.var.T(end-1,:); % zero heat flux
 
             % Sound speed and density at last interior cell
             a = s.var.a(end-1,2:end-1);
@@ -443,6 +451,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho_u(:,1) = 2 * s.var.rho_u(:,2) - s.var.rho_u(:,3);
             s.var.rho_v(:,1) = 2 * s.var.rho_v(:,2) - s.var.rho_v(:,3);
             s.var.p(:,1) = 2 * s.var.p(:,2) - s.var.p(:,3);
+            s.var.T(:,1) = s.var.T(:,2); % zero heat flux
 
             if ~s.chemistry.chemical_equilibrium
                 s.var.gamma_star(:,1) = 2 * s.var.gamma_star(:,2) - s.var.gamma_star(:,3);
@@ -455,6 +464,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho_v(:,1) = s.var.rho_v(:,2);
             s.var.rho_E(:,1) = s.var.rho_E(:,2);
             s.var.p(:,1) = s.var.p(:,2);
+            s.var.T(:,1) = s.var.T(:,2); % zero heat flux
 
             if ~s.chemistry.chemical_equilibrium
                 s.var.gamma_star(:,1) = s.var.gamma_star(:,2);
@@ -467,6 +477,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho_u(:,1) = 2 * s.var.rho_u(:,2) - s.var.rho_u(:,3);
             s.var.rho_v(:,1) = 2 * s.var.rho_v(:,2) - s.var.rho_v(:,3);
             s.var.p(:,1) = s.var.p(:,2); % zero pressure gradient
+            s.var.T(:,1) = s.var.T(:,2); % zero heat flux
 
             if ~s.chemistry.chemical_equilibrium
                 s.var.gamma_star(:,1) = s.var.gamma_star(:,2);
@@ -481,6 +492,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho_v(:,1) = 2 * s.var.rho_v(:,2) - s.var.rho_v(:,3);
             s.var.rho_E(:,1) = 2 * s.var.rho_E(:,2) - s.var.rho_E(:,3);
             s.var.p(:,1) = 2 * s.var.p(:,2) - s.var.p(:,3);
+            s.var.T(:,1) = s.var.T(:,2); % zero heat flux
 
             % Sound speed and density at first interior cell
             a = s.var.a(2:end-1,2);
@@ -612,6 +624,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho_u(:,end) = 2 * s.var.rho_u(:,end-1) - s.var.rho_u(:,end-2);
             s.var.rho_v(:,end) = 2 * s.var.rho_v(:,end-1) - s.var.rho_v(:,end-2);
             s.var.p(:,end) = 2 * s.var.p(:,end-1) - s.var.p(:,end-2);
+            s.var.T(:,end) = s.var.T(:,end-1); % zero heat flux
 
             if ~s.chemistry.chemical_equilibrium
                 s.var.gamma_star(:,end) = 2 * s.var.gamma_star(:,end-1) - s.var.gamma_star(:,end-2);
@@ -624,6 +637,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho_v(:,end) = s.var.rho_v(:,end-1);
             s.var.rho_E(:,end) = s.var.rho_E(:,end-1);
             s.var.p(:,end) = s.var.p(:,end-1);
+            s.var.T(:,end) = s.var.T(:,end-1); % zero heat flux
 
             if ~s.chemistry.chemical_equilibrium
                 s.var.gamma_star(:,end) = s.var.gamma_star(:,end-1);
@@ -636,6 +650,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho_u(:,end) = 2 * s.var.rho_u(:,end-1) - s.var.rho_u(:,end-2);
             s.var.rho_v(:,end) = 2 * s.var.rho_v(:,end-1) - s.var.rho_v(:,end-2);
             s.var.p(:,end) = s.var.p(:,end-1); % zero pressure gradient
+            s.var.T(:,end) = s.var.T(:,end-1); % zero heat flux
 
             if ~s.chemistry.chemical_equilibrium
                 s.var.gamma_star(:,end) = s.var.gamma_star(:,end-1);
@@ -650,6 +665,7 @@ function s = APPLY_BOUNDARY_CONDITIONS(s, chemistry)
             s.var.rho_v(:,end) = 2 * s.var.rho_v(:,end-1) - s.var.rho_v(:,end-2);
             s.var.rho_E(:,end) = 2 * s.var.rho_E(:,end-1) - s.var.rho_E(:,end-2);
             s.var.p(:,end) = 2 * s.var.p(:,end-1) - s.var.p(:,end-2);
+            s.var.T(:,end) = s.var.T(:,end-1); % zero heat flux
 
             % Sound speed and density at last interior cell
             a = s.var.a(2:end-1,end-1);
