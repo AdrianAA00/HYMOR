@@ -28,7 +28,9 @@ function s = PDE(s, chemistry)
 % Part of: Hypersonics Stability MATLAB Solver - Operators Module
 
     %% Update thermodynamic properties for new boundary conditions
-    s = UPDATE_CHEMISTRY_EQUILIBRIUM(s, chemistry);
+    if ~s.linearize
+        s = UPDATE_CHEMISTRY_EQUILIBRIUM(s, chemistry);
+    end
     s = UPDATE_THERMODYNAMIC_PROPERTIES(s, chemistry);
     s = UPDATE_SOUND_SPEED(s, chemistry);
 

@@ -94,6 +94,7 @@ function [V, D, T_opt] = FREESTREAM_RECEPTIVITY(A_, s, n_modes, T, w_infty)
     opts.tol = 1e-4;      % Convergence tolerance for eigs()
     opts.maxit = 10 * k;  % Maximum number of iterations (adjust as needed)
     opts.issym = true;    % Use symmetric Lanczos algorithm
+    opts.isreal = false;  % Use non real Lanczos algorithm
 
     t_eigs = tic;
     [V, D, flag] = eigs(@(x)CONSTRUCT_C(x, gA_dt, gAt_dt, gC_no_exp_, n_t, freestream_disturbances, N_set_0, use_gpu, x_buf, vout_buf, term_buf), n, D_, k, 'LM', opts);

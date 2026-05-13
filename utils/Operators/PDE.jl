@@ -14,7 +14,9 @@ function PDE(s::Dict{String, Any}, chemistry::Dict{String, Any})
     pde_dim      = s["PDE_dimension"]::String
 
     ## Update thermodynamic properties for new boundary conditions
-    s = UPDATE_CHEMISTRY_EQUILIBRIUM(s, chemistry)
+    if !is_linearize
+        s = UPDATE_CHEMISTRY_EQUILIBRIUM(s, chemistry)
+    end
     s = UPDATE_THERMODYNAMIC_PROPERTIES(s, chemistry)
     s = UPDATE_SOUND_SPEED(s, chemistry)
 
