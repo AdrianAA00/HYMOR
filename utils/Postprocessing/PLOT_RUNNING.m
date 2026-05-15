@@ -382,96 +382,133 @@ function updated_handles = PLOT_RUNNING(s, solution_temp_base, handles, chemistr
                     plot_c_data = p_curr_norm - p_base_norm;
                     name_latex = "$\Delta (P/P_\infty)$";
 
+                case "residuals"
+                    if ~s.time_integration.get_residual
+                        warning('Data for subplot %s could not be fully generated or is empty. Skipping this subplot.', current_var_name_str);
+                        continue
+                    end
+                    iter = s.time_integration.iter;
+                    if first_plot_call
+                        ax_r = subplot(num_subplot_rows, num_subplot_cols, v_idx, 'Parent', handles.fig);
+                        handles.residual(1) = semilogy(ax_r, iter, s.time_integration.residual.rho, '.-', 'LineWidth', 2, 'DisplayName', '$\rho$');
+                        hold(ax_r,'on');
+                        handles.residual(2) = semilogy(ax_r, iter, s.time_integration.residual.rho_u, '.-', 'LineWidth', 2, 'DisplayName', '$\rho u$');
+                        handles.residual(3) = semilogy(ax_r, iter, s.time_integration.residual.rho_v, '.-', 'LineWidth', 2, 'DisplayName', '$\rho v$');
+                        handles.residual(4) = semilogy(ax_r, iter, s.time_integration.residual.rho_E, '.-', 'LineWidth', 2, 'DisplayName', '$\rho E$');
+                        hold(ax_r,'off');
+                        legend(ax_r,'Interpreter','latex');
+                        xlabel(ax_r,'Iteration');
+                        title(ax_r,'RMS residuals (post-shock cells)');
+                        grid(ax_r,'on');
+                        handles.ax(v_idx) = ax_r;
+                    else
+                        set(handles.residual(1), ...
+                            'XData',[handles.residual(1).XData iter], ...
+                            'YData',[handles.residual(1).YData s.time_integration.residual.rho]);
+                        set(handles.residual(2), ...
+                            'XData',[handles.residual(2).XData iter], ...
+                            'YData',[handles.residual(2).YData s.time_integration.residual.rho_u]);
+                        set(handles.residual(3), ...
+                            'XData',[handles.residual(3).XData iter], ...
+                            'YData',[handles.residual(3).YData s.time_integration.residual.rho_v]);
+                        set(handles.residual(4), ...
+                            'XData',[handles.residual(4).XData iter], ...
+                            'YData',[handles.residual(4).YData s.time_integration.residual.rho_E]);
+                        set(handles.ax(v_idx),'XLimMode','auto','YLimMode','auto');
+                    end
+
                 otherwise
                     warning('Unknown variable selected for plotting: %s', current_var_name_str);
                     plot_x_coords = [];
             end
 
-            %% Skip if data could not be generated
-            if isempty(plot_x_coords) || isempty(plot_y_coords) || isempty(plot_c_data)
-                warning('Data for subplot %s could not be fully generated or is empty. Skipping this subplot.', current_var_name_str);
-                if first_plot_call && num_variables == 1 && isfield(handles, 'fig') && isvalid(handles.fig)
-                    try close(handles.fig); catch; end
-                    handles.fig = [];
-                end
-                continue;
-            end
-
-            %% Dimension check before plotting
-            if ~isequal(size(plot_x_coords), size(plot_y_coords), size(plot_c_data))
-                warning('Dimension mismatch for %s: X=[%s], Y=[%s], C=[%s]. Skipping subplot.', ...
-                    current_var_name_str, mat2str(size(plot_x_coords)), ...
-                    mat2str(size(plot_y_coords)), mat2str(size(plot_c_data)));
-                if first_plot_call && num_variables == 1 && isfield(handles, 'fig') && isvalid(handles.fig)
-                    try close(handles.fig); catch; end
-                    handles.fig = [];
-                end
-                continue;
-            end
-
-            %% Create or update subplot
-            if first_plot_call
-                handles.ax(v_idx) = subplot(num_subplot_rows, num_subplot_cols, v_idx, 'Parent', handles.fig);
-                handles.plot_object(v_idx) = pcolor(handles.ax(v_idx), plot_x_coords, plot_y_coords, plot_c_data);
-                shading(handles.ax(v_idx), 'interp');
-                set(handles.plot_object(v_idx), 'EdgeColor', 'none');
-                colormap(handles.ax(v_idx), "jet");
-                handles.colorbar(v_idx) = colorbar(handles.ax(v_idx));
-                handles.colorbar(v_idx).Label.Interpreter = 'latex';
-                handles.colorbar(v_idx).Label.String      = name_latex;
-                handles.colorbar(v_idx).Label.FontSize    = 10;
-
-                min_val = min(plot_c_data(:));
-                max_val = max(plot_c_data(:));
-                if min_val == max_val
-                    min_val = min_val * 2;
-                    max_val = max_val * 2;
-                    if min_val == 0 && max_val == 0
-                        min_val = -0.01;
-                        max_val = 0.01;
+            if ~strcmp(current_var_name_str,'residuals') % Residual plotting is handled separately
+                %% Skip if data could not be generated
+                if isempty(plot_x_coords) || isempty(plot_y_coords) || isempty(plot_c_data)
+                    warning('Data for subplot %s could not be fully generated or is empty. Skipping this subplot.', current_var_name_str);
+                    if first_plot_call && num_variables == 1 && isfield(handles, 'fig') && isvalid(handles.fig)
+                        try close(handles.fig); catch; end
+                        handles.fig = [];
                     end
+                    continue;
                 end
-                if isempty(min_val) || isnan(min_val) || isinf(min_val) || ...
-                        isempty(max_val) || isnan(max_val) || isinf(max_val)
-                    handles.caxis_limits_per_var{v_idx} = [];
+    
+                %% Dimension check before plotting
+                if ~isequal(size(plot_x_coords), size(plot_y_coords), size(plot_c_data))
+                    warning('Dimension mismatch for %s: X=[%s], Y=[%s], C=[%s]. Skipping subplot.', ...
+                        current_var_name_str, mat2str(size(plot_x_coords)), ...
+                        mat2str(size(plot_y_coords)), mat2str(size(plot_c_data)));
+                    if first_plot_call && num_variables == 1 && isfield(handles, 'fig') && isvalid(handles.fig)
+                        try close(handles.fig); catch; end
+                        handles.fig = [];
+                    end
+                    continue;
+                end
+    
+                %% Create or update subplot
+                if first_plot_call
+                    handles.ax(v_idx) = subplot(num_subplot_rows, num_subplot_cols, v_idx, 'Parent', handles.fig);
+                    handles.plot_object(v_idx) = pcolor(handles.ax(v_idx), plot_x_coords, plot_y_coords, plot_c_data);
+                    shading(handles.ax(v_idx), 'interp');
+                    set(handles.plot_object(v_idx), 'EdgeColor', 'none');
+                    colormap(handles.ax(v_idx), "jet");
+                    handles.colorbar(v_idx) = colorbar(handles.ax(v_idx));
+                    handles.colorbar(v_idx).Label.Interpreter = 'latex';
+                    handles.colorbar(v_idx).Label.String      = name_latex;
+                    handles.colorbar(v_idx).Label.FontSize    = 10;
+    
+                    min_val = min(plot_c_data(:));
+                    max_val = max(plot_c_data(:));
+                    if min_val == max_val
+                        min_val = min_val * 2;
+                        max_val = max_val * 2;
+                        if min_val == 0 && max_val == 0
+                            min_val = -0.01;
+                            max_val = 0.01;
+                        end
+                    end
+                    if isempty(min_val) || isnan(min_val) || isinf(min_val) || ...
+                            isempty(max_val) || isnan(max_val) || isinf(max_val)
+                        handles.caxis_limits_per_var{v_idx} = [];
+                    else
+                        handles.caxis_limits_per_var{v_idx} = [min_val, max_val];
+                    end
+    
+                    if ~isempty(handles.caxis_limits_per_var{v_idx})
+                        caxis(handles.ax(v_idx), handles.caxis_limits_per_var{v_idx});
+                    end
+    
+                    title(handles.ax(v_idx), name_latex, 'Interpreter', 'latex', 'FontSize', 11);
+                    xlabel(handles.ax(v_idx), '$x/L$', 'Interpreter', 'latex', 'FontSize', 9);
+                    ylabel(handles.ax(v_idx), '$y/L$', 'Interpreter', 'latex', 'FontSize', 9);
+                    axis(handles.ax(v_idx), 'equal');
+                    axis(handles.ax(v_idx), 'tight');
+    
+                    % Add shock line overlay
+                    if shock_line_exists
+                        hold(handles.ax(v_idx), 'on');
+                        handles.shock_line(v_idx) = plot(handles.ax(v_idx), x_p, y_p, 'black', 'LineWidth', 2);
+                        hold(handles.ax(v_idx), 'off');
+                    end
+    
                 else
-                    handles.caxis_limits_per_var{v_idx} = [min_val, max_val];
-                end
-
-                if ~isempty(handles.caxis_limits_per_var{v_idx})
-                    caxis(handles.ax(v_idx), handles.caxis_limits_per_var{v_idx});
-                end
-
-                title(handles.ax(v_idx), name_latex, 'Interpreter', 'latex', 'FontSize', 11);
-                xlabel(handles.ax(v_idx), '$x/L$', 'Interpreter', 'latex', 'FontSize', 9);
-                ylabel(handles.ax(v_idx), '$y/L$', 'Interpreter', 'latex', 'FontSize', 9);
-                axis(handles.ax(v_idx), 'equal');
-                axis(handles.ax(v_idx), 'tight');
-
-                % Add shock line overlay
-                if shock_line_exists
-                    hold(handles.ax(v_idx), 'on');
-                    handles.shock_line(v_idx) = plot(handles.ax(v_idx), x_p, y_p, 'black', 'LineWidth', 2);
-                    hold(handles.ax(v_idx), 'off');
-                end
-
-            else
-                %% Update existing plot data
-                set(handles.plot_object(v_idx), 'XData', plot_x_coords, 'YData', plot_y_coords, 'CData', plot_c_data);
-                if ~isempty(handles.caxis_limits_per_var{v_idx})
-                    caxis(handles.ax(v_idx), handles.caxis_limits_per_var{v_idx});
-                else
-                    caxis(handles.ax(v_idx), 'auto');
-                end
-
-                % Update shock line
-                if shock_line_exists
-                    set(handles.shock_line(v_idx), 'XData', x_p, 'YData', y_p);
-                elseif shock_line_exists && (length(handles.shock_line) < v_idx || ...
-                        isempty(handles.shock_line(v_idx)) || ~isvalid(handles.shock_line(v_idx)))
-                    hold(handles.ax(v_idx), 'on');
-                    handles.shock_line(v_idx) = plot(handles.ax(v_idx), x_p, y_p, 'black', 'LineWidth', 2);
-                    hold(handles.ax(v_idx), 'off');
+                    %% Update existing plot data
+                    set(handles.plot_object(v_idx), 'XData', plot_x_coords, 'YData', plot_y_coords, 'CData', plot_c_data);
+                    if ~isempty(handles.caxis_limits_per_var{v_idx})
+                        caxis(handles.ax(v_idx), handles.caxis_limits_per_var{v_idx});
+                    else
+                        caxis(handles.ax(v_idx), 'auto');
+                    end
+    
+                    % Update shock line
+                    if shock_line_exists
+                        set(handles.shock_line(v_idx), 'XData', x_p, 'YData', y_p);
+                    elseif shock_line_exists && (length(handles.shock_line) < v_idx || ...
+                            isempty(handles.shock_line(v_idx)) || ~isvalid(handles.shock_line(v_idx)))
+                        hold(handles.ax(v_idx), 'on');
+                        handles.shock_line(v_idx) = plot(handles.ax(v_idx), x_p, y_p, 'black', 'LineWidth', 2);
+                        hold(handles.ax(v_idx), 'off');
+                    end
                 end
             end
         end
@@ -483,6 +520,11 @@ function updated_handles = PLOT_RUNNING(s, solution_temp_base, handles, chemistr
         end
 
         drawnow;
+
+        % Option to each generated plot if 'plot_dir' is given
+        if isfield(s,'plot_dir')
+            savefig(handles.fig, sprintf("%s/runningplt_it%d.fig",s.plot_dir,s.time_integration.iter));
+        end
     end
     updated_handles = handles;
 end

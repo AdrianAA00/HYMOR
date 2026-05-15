@@ -72,7 +72,7 @@ function s = RUN_SIMULATION(s, solution_base, chemistry)
         if mod(s.time_integration.iter, 10) == 0
             fprintf("Iteration = %8i, Timestep = %.5f, Time = %.5f", ...
                     s.time_integration.iter, s.time_integration.dt, s.time_integration.t);
-            if s.time_integration.plot_residual
+            if s.time_integration.get_residual
                 fprintf("\nResidual: rho = %.3e, rho*u = %.3e, rho*v = %.3e, rho*E = %.3e\n", ...
                         s.time_integration.residual.rho, s.time_integration.residual.rho_u, s.time_integration.residual.rho_v, s.time_integration.residual.rho_E);
             end
