@@ -14,7 +14,9 @@ function varargout = FACE_GRADIENTS(mesh, varargin)
 %   varying meshes: second-order error).
 %
 %   Inputs:
-%       mesh   - Mesh structure (x_Ext, y_Ext, x_corner, y_corner).
+%       mesh   - Mesh structure (x_Ext, y_Ext, x_corner, y_corner and, when
+%                present, the cached geometry face_gradient from
+%                FACE_GRADIENT_GEOMETRY).
 %       f1,... - Cell fields on the extended grid (Nchi+2 x Neta+2).
 %
 %   Outputs:
@@ -24,17 +26,14 @@ function varargout = FACE_GRADIENTS(mesh, varargin)
 %
 % Part of: Hypersonics Stability MATLAB Solver - Operators Module
 
-    %% Inverse of [dx dy; tx ty] on each face family
-    lr = INVERSE_2X2( ...
-        mesh.x_Ext(2:end, 2:end-1) - mesh.x_Ext(1:end-1, 2:end-1), ...
-        mesh.y_Ext(2:end, 2:end-1) - mesh.y_Ext(1:end-1, 2:end-1), ...
-        mesh.x_corner(:, 2:end) - mesh.x_corner(:, 1:end-1), ...
-        mesh.y_corner(:, 2:end) - mesh.y_corner(:, 1:end-1));
-    bt = INVERSE_2X2( ...
-        mesh.x_Ext(2:end-1, 2:end) - mesh.x_Ext(2:end-1, 1:end-1), ...
-        mesh.y_Ext(2:end-1, 2:end) - mesh.y_Ext(2:end-1, 1:end-1), ...
-        mesh.x_corner(2:end, :) - mesh.x_corner(1:end-1, :), ...
-        mesh.y_corner(2:end, :) - mesh.y_corner(1:end-1, :));
+    %% Inverse of [dx dy; tx ty] on each face family (cached by GENERATE_MESH)
+    if isfield(mesh, 'face_gradient')
+        geometry = mesh.face_gradient;
+    else
+        geometry = FACE_GRADIENT_GEOMETRY(mesh);
+    end
+    lr = geometry.lr;
+    bt = geometry.bt;
 
     %% Gradients of every field
     varargout = cell(1, numel(varargin));
@@ -51,11 +50,4 @@ function varargout = FACE_GRADIENTS(mesh, varargin)
         g.y_bt = bt.yd .* df_d + bt.yt .* df_t;
         varargout{k} = g;
     end
-end
-
-function c = INVERSE_2X2(dx, dy, tx, ty)
-% INVERSE_2X2  Entries of inv([dx dy; tx ty]), element-wise.
-    det = dx .* ty - dy .* tx;
-    c.xd =  ty ./ det;   c.xt = -dy ./ det;
-    c.yd = -tx ./ det;   c.yt =  dx ./ det;
 end

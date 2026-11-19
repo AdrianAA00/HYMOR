@@ -435,6 +435,11 @@ function chemistry = FIT_CHEMISTRY(chemistry)
     chemistry.eval_cv_star = @(rho_new, e_new) EVAL_GRIDDED_INTERPOLANT_LOG_INPUTS(rho_new, e_new, chemistry.fit_cv_star, chemistry.fit_info.log_rho_range, chemistry.fit_info.log_e_range, chemistry.fit_info.cv_star_range);
     chemistry.eval_mu = @(rho_new, e_new) EVAL_GRIDDED_INTERPOLANT_LOG_INPUTS(rho_new, e_new, chemistry.fit_mu, chemistry.fit_info.log_rho_range, chemistry.fit_info.log_e_range, chemistry.fit_info.mu_range);
     chemistry.eval_k = @(rho_new, e_new) EVAL_GRIDDED_INTERPOLANT_LOG_INPUTS(rho_new, e_new, chemistry.fit_k, chemistry.fit_info.log_rho_range, chemistry.fit_info.log_e_range, chemistry.fit_info.k_range);
+    % gamma_star, cv_star, mu and k from one log/scale transform of (rho, e)
+    chemistry.eval_state_properties = @(rho_new, e_new) EVAL_GRIDDED_INTERPOLANTS_LOG_INPUTS(rho_new, e_new, ...
+        {chemistry.fit_gamma_star, chemistry.fit_cv_star, chemistry.fit_mu, chemistry.fit_k}, ...
+        chemistry.fit_info.log_rho_range, chemistry.fit_info.log_e_range, ...
+        {chemistry.fit_info.gamma_star_range, chemistry.fit_info.cv_star_range, chemistry.fit_info.mu_range, chemistry.fit_info.k_range});
     if has_a
         chemistry.eval_a = @(rho_new, e_new) EVAL_GRIDDED_INTERPOLANT_LOG_INPUTS(rho_new, e_new, chemistry.fit_a, chemistry.fit_info.log_rho_range, chemistry.fit_info.log_e_range, chemistry.fit_info.a_range);
     end
@@ -548,61 +553,46 @@ function result = EVAL_GRIDDED_INTERPOLANT_LOG_INPUTS(rho_new, e_new, interpolan
 % Outputs:
 %   result - Interpolated values in original units
 
-    % Handle non-positive values with extrapolation instead of NaN
-    result = zeros(size(rho_new));
-    valid_mask = (rho_new > 0) & (e_new > 0);
+    result = EVAL_GRIDDED_INTERPOLANTS_LOG_INPUTS(rho_new, e_new, {interpolant}, log_rho_range, log_e_range, {values_range});
+end
 
-    if ~any(valid_mask(:))
-        % All values are non-positive - use minimum log ranges
-        log_rho_min = log_rho_range(1);
-        log_e_min = log_e_range(1);
-        log_rho_new_extrap = log_rho_min * ones(size(rho_new));
-        log_e_new_extrap = log_e_min * ones(size(e_new));
-        log_rho_new_scaled = SCALE_TO_MINUS_ONE_TO_ONE(log_rho_new_extrap, log_rho_range);
-        log_e_new_scaled = SCALE_TO_MINUS_ONE_TO_ONE(log_e_new_extrap, log_e_range);
-        result_scaled = interpolant(log_e_new_scaled, log_rho_new_scaled);
-        result = SCALE_FROM_MINUS_ONE_TO_ONE(result_scaled, values_range);
-        return;
+
+%% ========================================================================
+%  EVAL_GRIDDED_INTERPOLANTS_LOG_INPUTS - Several properties, one transform
+%  ========================================================================
+function varargout = EVAL_GRIDDED_INTERPOLANTS_LOG_INPUTS(rho_new, e_new, interpolants, log_rho_range, log_e_range, values_ranges)
+% EVAL_GRIDDED_INTERPOLANTS_LOG_INPUTS - Evaluate several properties at the same (rho, e)
+%
+% Transforms the query points to log10 space and scales them to [-1, 1]
+% once, then evaluates every griddedInterpolant and unscales each result.
+% Non-positive rho or e take the minimum log value of the table (all of
+% them when no point is valid), as in EVAL_GRIDDED_INTERPOLANT_LOG_INPUTS.
+%
+% Inputs:
+%   rho_new       - Query densities in original units (kg/m^3)
+%   e_new         - Query energies in original units (J/kg)
+%   interpolants  - Cell array of griddedInterpolant objects (scaled log inputs)
+%   log_rho_range - [min, max] of log10(rho) for scaling
+%   log_e_range   - [min, max] of log10(e) for scaling
+%   values_ranges - Cell array of [min, max] output ranges, one per interpolant
+%
+% Outputs:
+%   varargout - Interpolated values in original units, one per interpolant
+
+    log_rho = log_rho_range(1) * ones(size(rho_new));
+    log_e = log_e_range(1) * ones(size(e_new));
+    if any((rho_new(:) > 0) & (e_new(:) > 0))
+        positive_rho = rho_new > 0;
+        positive_e = e_new > 0;
+        log_rho(positive_rho) = log10(rho_new(positive_rho));
+        log_e(positive_e) = log10(e_new(positive_e));
     end
+    log_rho_scaled = SCALE_TO_MINUS_ONE_TO_ONE(log_rho, log_rho_range);
+    log_e_scaled = SCALE_TO_MINUS_ONE_TO_ONE(log_e, log_e_range);
 
-    % Process valid positive rho and e values
-    if any(valid_mask(:))
-        log_rho_new = log10(rho_new(valid_mask));
-        log_e_new = log10(e_new(valid_mask));
-
-        log_rho_new_scaled = SCALE_TO_MINUS_ONE_TO_ONE(log_rho_new, log_rho_range);
-        log_e_new_scaled = SCALE_TO_MINUS_ONE_TO_ONE(log_e_new, log_e_range);
-
-        result_scaled = interpolant(log_e_new_scaled, log_rho_new_scaled);
-        result(valid_mask) = SCALE_FROM_MINUS_ONE_TO_ONE(result_scaled, values_range);
-    end
-
-    % For invalid values, extrapolate using minimum log values
-    if any(~valid_mask(:))
-        log_rho_min = log_rho_range(1);
-        log_e_min = log_e_range(1);
-
-        log_rho_extrap = log_rho_min * ones(sum(~valid_mask(:)), 1);
-        log_e_extrap = log_e_min * ones(sum(~valid_mask(:)), 1);
-
-        % Override with actual log values where possible
-        invalid_rho = rho_new(~valid_mask);
-        invalid_e = e_new(~valid_mask);
-        valid_rho_only = invalid_rho > 0;
-        valid_e_only = invalid_e > 0;
-
-        if any(valid_rho_only)
-            log_rho_extrap(valid_rho_only) = log10(invalid_rho(valid_rho_only));
-        end
-        if any(valid_e_only)
-            log_e_extrap(valid_e_only) = log10(invalid_e(valid_e_only));
-        end
-
-        log_rho_new_scaled = SCALE_TO_MINUS_ONE_TO_ONE(log_rho_extrap, log_rho_range);
-        log_e_new_scaled = SCALE_TO_MINUS_ONE_TO_ONE(log_e_extrap, log_e_range);
-
-        result_scaled = interpolant(log_e_new_scaled, log_rho_new_scaled);
-        result(~valid_mask) = SCALE_FROM_MINUS_ONE_TO_ONE(result_scaled, values_range);
+    varargout = cell(1, numel(interpolants));
+    for k = 1:numel(interpolants)
+        varargout{k} = SCALE_FROM_MINUS_ONE_TO_ONE(interpolants{k}(log_e_scaled, log_rho_scaled), values_ranges{k});
     end
 end
 
