@@ -312,6 +312,9 @@ function s = VERIFY_INPUT_DATA(s)
     assert(isnumeric(s.stability_analysis.perturbation_magnitude) && s.stability_analysis.perturbation_magnitude > 0, 'stability_analysis.perturbation_magnitude must be positive numeric');
     assert(isfield(s.stability_analysis, 'eigenvalue_solver'), 'Missing field: stability_analysis.eigenvalue_solver');
     assert(ismember(s.stability_analysis.eigenvalue_solver, ["CPU_LU", "GPU_TIMESTEPPER_ARNOLDI"]), 'Invalid eigenvalue_solver');
+    if isfield(s.stability_analysis, 'device')
+        assert(ismember(s.stability_analysis.device, ["auto", "cpu", "gpu"]), 'stability_analysis.device must be "auto", "cpu" or "gpu"');
+    end
     if ~isfield(s.stability_analysis, 'perturb_shock')
         s.stability_analysis.perturb_shock = false;
     else

@@ -1,6 +1,6 @@
 # Tutorial: Non-Axisymmetric Stability of Pipe Flow (MATLAB)
 
-Runtime: about 3 min on a CPU (see the note on GPUs below)
+Runtime: about 3 min (see the note on the device below)
 
 ## Goal
 
@@ -97,7 +97,7 @@ solution_tg.stability_analysis.azimuthal_wavenumber = 1;
 - **Higher Mach number in this step:** the exponential time-stepper is acoustic, $\Delta t \propto M$. $M = 0.1$ halves its cost and changes $G$ by less than 0.2%.
 - **Norm:** HYMOR maximizes Chu's energy. At these Mach numbers the optimal disturbance is purely kinetic, so $G$ compares directly with the incompressible kinetic-energy gain of the reference.
 
-> **GPUs.** The exponential time-stepper runs on the GPU whenever one is visible. This operator has only about 600 unknowns, so it is latency bound there and much slower than on the CPU: 20 s and 80 s for $T = 10$ and $50$ on the CPU. To force the CPU, start MATLAB with `CUDA_VISIBLE_DEVICES=""`.
+> **Device.** With `stability_analysis.device = "auto"` the exponential time-stepper runs on the GPU only for operators with at least $3\cdot10^5$ nonzeros: below that a GPU step is bound by kernel-launch latency. This operator has only a few hundred unknowns, so it runs on the CPU: 13 s and 66 s for $T = 10$ and $50$.
 
 ---
 

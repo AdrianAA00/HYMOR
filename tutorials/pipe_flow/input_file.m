@@ -59,6 +59,7 @@ solution.shock.enabled = false;  % No shock
 %% Stability analysis
 solution.stability_analysis.perturbation_magnitude = 1e-6;      % Linearization perturbation size (rho*E ~ 1/Mach^2: 1e-8 loses digits)
 solution.stability_analysis.eigenvalue_solver      = "CPU_LU";  % Eigensolver: "CPU_LU", "GPU_TIMESTEPPER_ARNOLDI"
+solution.stability_analysis.device                 = "auto";    % Time-stepper device: "auto" (GPU for large operators), "cpu", "gpu"
 solution.stability_analysis.azimuthal_wavenumber   = 1;         % Azimuthal wavenumber m of the disturbances
 
 %% Running plots

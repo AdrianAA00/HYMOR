@@ -29,7 +29,7 @@ function max_gain = LINEAR_INTEGRATION_AND_GAINS(freestream_disturbances, v, lam
 %
 %   Notes:
 %       - Uses 5th-order Taylor expansion for the matrix exponential.
-%       - All heavy computations are performed on the GPU.
+%       - The time integration runs on the device chosen by USE_GPU.
 %       - Generates multiple publication-quality figures for energy gains,
 %         kinetic energy budgets, and entropic energy budgets.
 %
@@ -38,7 +38,6 @@ function max_gain = LINEAR_INTEGRATION_AND_GAINS(freestream_disturbances, v, lam
     %% Time-stepping parameters
     assert(get_amplification_only || ~isfield(s, 'azimuthal'), ...
         'Energy budgets are not available for azimuthal modes: use get_amplification_only = true');
-    orderTaylor = 5; % Order of Taylor expansion for matrix exponential approximation
 
     s = CFL_TIMESTEP(s);
     t_temp = s.time_integration.dt;
@@ -51,16 +50,13 @@ function max_gain = LINEAR_INTEGRATION_AND_GAINS(freestream_disturbances, v, lam
     fprintf("Number timesteps = %f ", n_t)
     fprintf("\n")
 
-    %% Construct energy-norm operators
+    %% Construct energy-norm operators (the total energy is E_p + E_k + E_S)
     if freestream_disturbances
         R_ = CONSTRUCT_R_(s, w_infty);
         norms = [1, 1, 1, 1];
-        M_ = CONSTRUCT_M_(s, norms, w_infty);
-
         T = 1;
         scaling_non_temporal = false;
         M_infty_ = CONSTRUCT_M_INFTY_(s, norms, T, w_infty, scaling_non_temporal);
-        C_no_exp_all = R_' * M_ * R_;
         D = R_' * M_infty_ * R_;
 
         % Pressure component
@@ -81,9 +77,7 @@ function max_gain = LINEAR_INTEGRATION_AND_GAINS(freestream_disturbances, v, lam
     else
         R = CONSTRUCT_R(s);
         norms = [1, 1, 1, 1];
-        M = CONSTRUCT_M(s, norms);
         M_hat = CONSTRUCT_M_HAT(s, norms);
-        C_no_exp_all = R' * M * R;
         D = R' * M_hat * R;
 
         % Pressure component
@@ -102,58 +96,17 @@ function max_gain = LINEAR_INTEGRATION_AND_GAINS(freestream_disturbances, v, lam
         C_no_exp_S = R' * M * R;
     end
 
-    %% Detect GPU availability and pre-allocate
-    use_gpu = (gpuDeviceCount > 0);
-    n_vec = size(A_, 1);
-
-    if use_gpu
-        gpu = gpuDevice;
-        disp(gpu.Name + " selected.")
-        gA_            = gpuArray(A_ * dt);
-        gC_no_exp_all  = gpuArray(C_no_exp_all);
-        gC_no_exp_p    = gpuArray(C_no_exp_p);
-        gC_no_exp_k    = gpuArray(C_no_exp_k);
-        gC_no_exp_S    = gpuArray(C_no_exp_S);
-        v_buf          = gpuArray(zeros(n_vec, 1));
-        vout_buf       = gpuArray(zeros(n_vec, 1));
-        term_buf       = gpuArray(zeros(n_vec, 1));
-    else
-        disp("No CUDA device found. Running on CPU.")
-        gA_            = A_ * dt;
-        gC_no_exp_all  = C_no_exp_all;
-        gC_no_exp_p    = C_no_exp_p;
-        gC_no_exp_k    = C_no_exp_k;
-        gC_no_exp_S    = C_no_exp_S;
-        v_buf          = zeros(n_vec, 1);
-        vout_buf       = zeros(n_vec, 1);
-        term_buf       = zeros(n_vec, 1);
-    end
-
     %% Integration (GPU or CPU)
+    use_gpu = USE_GPU(s, A_);
     if get_amplification_only
-        tic
-        [t, E_all, E_p, E_k, E_S] = LINEAR_INTEGRATION_AND_ENERGY_GPU_NO_SAMPLES(v, n_t, dt, 0, orderTaylor, gA_, gC_no_exp_all, gC_no_exp_p, gC_no_exp_k, gC_no_exp_S, use_gpu, v_buf, vout_buf, term_buf);
-        toc
-    else
-        tic
-        [t, E_all, E_p, E_k, E_S, vf] = LINEAR_INTEGRATION_AND_ENERGY_GPU(v, n_t, N_samples, N_skip, dt, 0, orderTaylor, gA_, gC_no_exp_all, gC_no_exp_p, gC_no_exp_k, gC_no_exp_S, use_gpu, v_buf, vout_buf, term_buf);
-        toc
+        N_samples = 0;
     end
-
-    %% GPU synchronization and memory cleanup
-    if use_gpu
-        wait(gpu);
-        clear gA_ gC_no_exp_all gC_no_exp_p gC_no_exp_k gC_no_exp_S v_buf vout_buf term_buf;
-        wait(gpu);
-    else
-        clear gA_ gC_no_exp_all gC_no_exp_p gC_no_exp_k gC_no_exp_S v_buf vout_buf term_buf;
-    end
-
-    %% Set initial energy values
-    E_all(1) = real(v)' * C_no_exp_all * real(v);
-    E_p(1) = real(v)' * C_no_exp_p * real(v);
-    E_k(1) = real(v)' * C_no_exp_k * real(v);
-    E_S(1) = real(v)' * C_no_exp_S * real(v);
+    prop = TAYLOR_PROPAGATOR(A_, dt, use_gpu, false);
+    energies = prop.matrix([C_no_exp_p; C_no_exp_k; C_no_exp_S]);
+    tic
+    [t, E_p, E_k, E_S, vf] = LINEAR_INTEGRATION_AND_ENERGY(v, n_t, dt, prop, energies, N_skip, N_samples);
+    toc
+    E_all = E_p + E_k + E_S;
 
     %% Plotting parameters
     fontsize_labels = 16;
@@ -450,156 +403,53 @@ function max_gain = LINEAR_INTEGRATION_AND_GAINS(freestream_disturbances, v, lam
 end
 
 
-function [t, E_all, E_p, E_k, E_S, Vf] = LINEAR_INTEGRATION_AND_ENERGY_GPU(x, n_t, N_samples, N_skip, dt, t_0, orderTaylor, Adt, C_no_exp_all, C_no_exp_p, C_no_exp_k, C_no_exp_S, use_gpu, v_buf, vout_buf, term_buf)
-% LINEAR_INTEGRATION_AND_ENERGY_GPU  Forward integration with energy tracking and sampling.
-%   Works on both GPU and CPU using pre-allocated buffers.
+function [t, E_p, E_k, E_S, Vf] = LINEAR_INTEGRATION_AND_ENERGY(x, n_t, dt, prop, energies, N_skip, N_samples)
+% LINEAR_INTEGRATION_AND_ENERGY  Forward integration with the energy history and snapshots.
 %
-%   [t, E_all, E_p, E_k, E_S, Vf] = LINEAR_INTEGRATION_AND_ENERGY_GPU(...)
+%   [t, E_p, E_k, E_S, Vf] = LINEAR_INTEGRATION_AND_ENERGY(x, n_t, dt, prop, energies, N_skip, N_samples)
+%
+%   Advances x by n_t Taylor steps (TAYLOR_STEPS) and records the pressure,
+%   kinetic and entropic energies of real(x) at t = 0 and after every step.
+%   The energies stay on the device until the end, so a GPU step has no
+%   transfer or synchronization. Every N_skip steps the state is stored,
+%   up to N_samples snapshots.
 %
 %   Inputs:
-%       x             - Initial state vector (CPU)
-%       n_t           - Number of time steps
-%       N_samples     - Number of state snapshots to store
-%       N_skip        - Steps between successive snapshots
-%       dt            - Time step size
-%       t_0           - Initial time
-%       orderTaylor   - Taylor series order for matrix exponential
-%       Adt           - System matrix A*dt (gpuArray or CPU sparse)
-%       C_no_exp_all  - Total energy weight operator (gpuArray or CPU sparse)
-%       C_no_exp_p    - Pressure energy weight operator
-%       C_no_exp_k    - Kinetic energy weight operator
-%       C_no_exp_S    - Entropy energy weight operator
-%       use_gpu       - Logical flag: true for GPU path, false for CPU path
-%       v_buf         - Pre-allocated buffer for working vector
-%       vout_buf      - Pre-allocated buffer for output accumulation
-%       term_buf      - Pre-allocated buffer for Taylor term
+%       x         - Initial state vector (CPU)
+%       n_t       - Number of time steps
+%       dt        - Time step size
+%       prop      - Time stepper from TAYLOR_PROPAGATOR
+%       energies  - Handle computing [C_p; C_k; C_S] * x, from prop.matrix
+%       N_skip    - Steps between stored snapshots
+%       N_samples - Maximum number of snapshots (0: none)
 %
 %   Outputs:
-%       t     - Time vector (CPU)
-%       E_all - Total energy history (CPU)
-%       E_p   - Pressure energy history (CPU)
-%       E_k   - Kinetic energy history (CPU)
-%       E_S   - Entropy energy history (CPU)
-%       Vf    - Sampled state vectors (CPU, columns)
+%       t             - Time vector (n_t + 1)
+%       E_p, E_k, E_S - Pressure, kinetic and entropic energy histories (CPU)
+%       Vf            - Stored snapshots (CPU, columns)
 
-    %% Allocate storage
-    E_all = zeros(n_t + 1, 1);
-    E_p = zeros(n_t + 1, 1);
-    E_k = zeros(n_t + 1, 1);
-    E_S = zeros(n_t + 1, 1);
-    t = zeros(n_t + 1, 1);
-    n_vec = numel(x);
-    Vf_store = zeros(n_vec, N_samples);
-
-    t(1) = t_0;
-
-    %% Copy initial vector into pre-allocated buffer
-    v_buf(:) = x;
-    vout_buf(:) = v_buf;
-
-    %% Forward propagation via Taylor-series exponential (no allocation)
-    count = 1;
+    n = numel(x);
+    t = dt * (0:n_t)';
+    Vf = zeros(n, min(N_samples, floor(n_t / N_skip)));
+    x = prop.load(x);
+    E = zeros(n_t + 1, 3, 'like', real(x));
+    E(1, :) = ENERGIES(x, energies, n);
     for i = 1:n_t
-        factorial_val = 1;
-        for j = 1:orderTaylor
-            term_buf(:) = Adt * v_buf;
-            v_buf(:) = term_buf;
-            factorial_val = j * factorial_val;
-            vout_buf(:) = vout_buf + v_buf / factorial_val;
+        x = TAYLOR_STEPS(x, prop.step, 1);
+        E(i + 1, :) = ENERGIES(x, energies, n);
+        if mod(i, N_skip) == 0 && i / N_skip <= size(Vf, 2)
+            Vf(:, i / N_skip) = prop.unload(x);
         end
-        v_buf(:) = vout_buf;
-        if mod(i, N_skip) == 0 && count <= N_samples
-            if use_gpu
-                Vf_store(:, count) = gather(v_buf);
-            else
-                Vf_store(:, count) = v_buf;
-            end
-            count = count + 1;
-        end
-
-        % Store iteration data
-        t(i+1) = t(i) + dt;
-        if use_gpu
-            v_real = gather(real(v_buf));
-        else
-            v_real = real(v_buf);
-        end
-        E_all(i+1) = v_real' * gather(C_no_exp_all * real(v_buf));
-        E_p(i+1) = v_real' * gather(C_no_exp_p * real(v_buf));
-        E_k(i+1) = v_real' * gather(C_no_exp_k * real(v_buf));
-        E_S(i+1) = v_real' * gather(C_no_exp_S * real(v_buf));
     end
-
-    Vf = Vf_store;
+    E = gather(E);
+    E_p = E(:, 1);
+    E_k = E(:, 2);
+    E_S = E(:, 3);
 end
 
 
-function [t, E_all, E_p, E_k, E_S] = LINEAR_INTEGRATION_AND_ENERGY_GPU_NO_SAMPLES(x, n_t, dt, t_0, orderTaylor, Adt, C_no_exp_all, C_no_exp_p, C_no_exp_k, C_no_exp_S, use_gpu, v_buf, vout_buf, term_buf)
-% LINEAR_INTEGRATION_AND_ENERGY_GPU_NO_SAMPLES  Forward integration (energy only, no snapshots).
-%   Works on both GPU and CPU using pre-allocated buffers.
-%
-%   [t, E_all, E_p, E_k, E_S] = LINEAR_INTEGRATION_AND_ENERGY_GPU_NO_SAMPLES(...)
-%
-%   Same as LINEAR_INTEGRATION_AND_ENERGY_GPU but without storing intermediate
-%   state snapshots, reducing memory usage.
-%
-%   Inputs:
-%       x             - Initial state vector (CPU)
-%       n_t           - Number of time steps
-%       dt            - Time step size
-%       t_0           - Initial time
-%       orderTaylor   - Taylor series order for matrix exponential
-%       Adt           - System matrix A*dt (gpuArray or CPU sparse)
-%       C_no_exp_all  - Total energy weight operator
-%       C_no_exp_p    - Pressure energy weight operator
-%       C_no_exp_k    - Kinetic energy weight operator
-%       C_no_exp_S    - Entropy energy weight operator
-%       use_gpu       - Logical flag: true for GPU path, false for CPU path
-%       v_buf         - Pre-allocated buffer for working vector
-%       vout_buf      - Pre-allocated buffer for output accumulation
-%       term_buf      - Pre-allocated buffer for Taylor term
-%
-%   Outputs:
-%       t     - Time vector (CPU)
-%       E_all - Total energy history (CPU)
-%       E_p   - Pressure energy history (CPU)
-%       E_k   - Kinetic energy history (CPU)
-%       E_S   - Entropy energy history (CPU)
-
-    %% Allocate storage
-    E_all = zeros(n_t + 1, 1);
-    E_p = zeros(n_t + 1, 1);
-    E_k = zeros(n_t + 1, 1);
-    E_S = zeros(n_t + 1, 1);
-    t = zeros(n_t + 1, 1);
-
-    t(1) = t_0;
-
-    %% Copy initial vector into pre-allocated buffer
-    v_buf(:) = x;
-    vout_buf(:) = v_buf;
-
-    %% Forward propagation via Taylor-series exponential (no allocation)
-    for i = 1:n_t
-        factorial_val = 1;
-        for j = 1:orderTaylor
-            term_buf(:) = Adt * v_buf;
-            v_buf(:) = term_buf;
-            factorial_val = j * factorial_val;
-            vout_buf(:) = vout_buf + v_buf / factorial_val;
-        end
-        v_buf(:) = vout_buf;
-
-        % Store iteration data
-        t(i+1) = t(i) + dt;
-        if use_gpu
-            v_real = gather(real(v_buf));
-        else
-            v_real = real(v_buf);
-        end
-        E_all(i+1) = v_real' * gather(C_no_exp_all * real(v_buf));
-        E_p(i+1) = v_real' * gather(C_no_exp_p * real(v_buf));
-        E_k(i+1) = v_real' * gather(C_no_exp_k * real(v_buf));
-        E_S(i+1) = v_real' * gather(C_no_exp_S * real(v_buf));
-    end
+function e = ENERGIES(x, energies, n)
+% ENERGIES  Energy components x_r' C_part x_r of the real part x_r of x (1 x 3).
+    x_r = real(x);
+    e = x_r.' * reshape(energies(x_r), n, 3);   % row form: transposing the n x 3 block is slow on the GPU
 end

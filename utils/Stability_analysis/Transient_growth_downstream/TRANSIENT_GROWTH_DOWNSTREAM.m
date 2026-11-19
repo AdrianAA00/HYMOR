@@ -6,7 +6,7 @@ function [V, D, T_opt] = TRANSIENT_GROWTH_DOWNSTREAM(A, s, n_modes, T)
 %   Solves the generalized eigenvalue problem for transient energy growth
 %   in the downstream flow domain. Uses a matrix-free approach with eigs()
 %   to find the n_modes largest-gain eigenmodes at the specified time
-%   horizon T. Automatically detects GPU availability.
+%   horizon T. Runs on the device chosen by USE_GPU.
 %
 %   Inputs:
 %       A        - System Jacobian matrix (sparse)
@@ -23,13 +23,12 @@ function [V, D, T_opt] = TRANSIENT_GROWTH_DOWNSTREAM(A, s, n_modes, T)
 %   Notes:
 %       - Returns V=0, D=0, T_opt=0 when transient_growth_downstream_analysis is false.
 %       - The matrix exponential is approximated with a 5th-order Taylor series.
-%       - All memory is pre-allocated outside eigs. Only copies inside callback.
-%       - GPU is synchronized and memory verified deallocated before returning.
+%       - Largest gains by BLOCK_LANCZOS on the GPU (blocks of 4 vectors per
+%         propagation) and by eigs (Lanczos) on the CPU.
 %
 % Part of: Hypersonics Stability MATLAB Solver - Transient Growth Downstream Module
 
     k =  n_modes;    % Number of modes to compute
-    freestream_disturbances = false;
 
     %% Compute time-stepping parameters
     s = CFL_TIMESTEP(s);
@@ -55,56 +54,29 @@ function [V, D, T_opt] = TRANSIENT_GROWTH_DOWNSTREAM(A, s, n_modes, T)
     fprintf("Number timesteps = %f ", n_t)
     fprintf("\n")
 
-    %% Detect GPU availability
-    use_gpu = (gpuDeviceCount > 0);
-    n = size(A, 1);
+    %% Device of the time stepper
+    use_gpu = USE_GPU(s, A);
+    prop = TAYLOR_PROPAGATOR(A, dt, use_gpu, true);
+    C = prop.matrix(C_no_exp);
+    apply = @(x) CONSTRUCT_C(x, prop, C, n_t, 0);
 
-    if use_gpu
-        gpu = gpuDevice;
-        disp(gpu.Name + " selected.")
-    else
-        disp("No CUDA device found. Running on CPU.")
-    end
-
-    %% Pre-allocate ALL memory outside eigs (matrices + work buffers)
-    A_dt = A * dt;
-    At_dt = A_dt';  % Transpose on CPU to preserve sparsity
-
-    if use_gpu
-        gA_dt      = gpuArray(A_dt);
-        gAt_dt     = gpuArray(At_dt);
-        gC_no_exp  = gpuArray(C_no_exp);
-        x_buf      = gpuArray(zeros(n, 1));
-        vout_buf   = gpuArray(zeros(n, 1));
-        term_buf   = gpuArray(zeros(n, 1));
-    else
-        gA_dt      = A_dt;
-        gAt_dt     = At_dt;
-        gC_no_exp  = C_no_exp;
-        x_buf      = zeros(n, 1);
-        vout_buf   = zeros(n, 1);
-        term_buf   = zeros(n, 1);
-    end
-
-    opts.tol = 1e-4;     % Convergence tolerance for eigs()
-    opts.maxit = 10 * k; % Maximum number of iterations (adjust as needed)
-    opts.issym = true;   % Use symmetric Lanczos algorithm
-
+    %% Largest gains of the generalized eigenvalue problem
+    % On the GPU, block Lanczos propagates BLOCK_SIZE vectors at once: one
+    % sparse product per Taylor order for the whole block.
     t_eigs = tic;
-    [V, D, flag] = eigs(@(x)CONSTRUCT_C(x, gA_dt, gAt_dt, gC_no_exp, n_t, freestream_disturbances, 0, use_gpu, x_buf, vout_buf, term_buf), n, D, k, 'LM', opts);
+    if use_gpu
+        BLOCK_SIZE = 4;
+        [V, gains, flag] = BLOCK_LANCZOS(apply, D, k, BLOCK_SIZE, 1e-4, 25 * BLOCK_SIZE, true);
+        D = diag(gains);
+    else
+        opts.tol = 1e-4;     % Convergence tolerance for eigs()
+        opts.maxit = 10 * k; % Maximum number of iterations (adjust as needed)
+        opts.issym = true;   % Use symmetric Lanczos algorithm
+        [V, D, flag] = eigs(apply, size(A, 1), D, k, 'LM', opts);
+    end
     fprintf("Eigenvalue solve time: %.6f seconds\n", toc(t_eigs));
     if flag ~= 0
         warning('eigs did not fully converge');
-    end
-
-    %% GPU synchronization and memory cleanup
-    if use_gpu
-        wait(gpu);  % Synchronize GPU - catch any async errors
-        clear gA_dt gAt_dt gC_no_exp x_buf vout_buf term_buf;
-        wait(gpu);  % Verify memory is deallocated
-        reset(gpuDevice);
-    else
-        clear gA_dt gAt_dt gC_no_exp x_buf vout_buf term_buf;
     end
 
     %% Print eigenvalues

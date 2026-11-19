@@ -19,11 +19,10 @@ function [V, D] = EIGENVALUES(A, s, n_modes)
 %
 %   Notes:
 %       - For GPU_ARNOLDI, eigenvalues of the time-stepping operator are
-%         converted to continuous-time eigenvalues via logarithmic mapping.
+%         converted to continuous-time eigenvalues via logarithmic mapping,
+%         on the branch given by the Rayleigh quotient of each eigenvector.
 %       - The CFL time step is recomputed before GPU analysis.
-%       - Detects CUDA availability: uses GPU if available, CPU otherwise.
-%       - All memory is pre-allocated outside eigs and only copies are done
-%         inside the eigs callback. GPU is synchronized before cleanup.
+%       - The time stepper runs on the device chosen by USE_GPU.
 %
 % Part of: Hypersonics Stability MATLAB Solver - Stability Analysis / Eigenvalues Module
 
@@ -88,24 +87,16 @@ end
 %  ========================================================================
 function [V, D] = EIGENVALUES_GPU_ARNOLDI(A, s, n_modes)
 % EIGENVALUES_GPU_ARNOLDI  Compute eigenvalues using Arnoldi iteration
-%   with a Taylor-expansion time stepper. Automatically detects GPU
-%   availability and falls back to CPU if no CUDA device is found.
-%   All memory is pre-allocated outside eigs to avoid repeated allocation.
+%   on the Taylor time stepper exp(A T_ref), on the device chosen by
+%   USE_GPU.
 
     fprintf("\n")
     disp("----------------------------------------------------")
     disp(" Eigenvalue solver: Arnoldi + exponential transform ")
     disp("----------------------------------------------------")
 
-    %% Detect GPU availability
-    use_gpu = (gpuDeviceCount > 0);
-
-    if use_gpu
-        gpu = gpuDevice;
-        disp(gpu.Name + " selected.")
-    else
-        disp("No CUDA device found. Running on CPU.")
-    end
+    %% Device of the time stepper
+    use_gpu = USE_GPU(s, A);
 
     %% Time-stepping parameters
     T_ref = 0.5; % Time to evolve
@@ -113,52 +104,31 @@ function [V, D] = EIGENVALUES_GPU_ARNOLDI(A, s, n_modes)
     dt = s.time_integration.dt;
     timesteps = round(T_ref/dt);
     fprintf("Number of timesteps: %f\n", timesteps)
-    n = size(A, 1);
-    k = n_modes;
+    prop = TAYLOR_PROPAGATOR(A, dt, use_gpu, false);
 
-    %% Pre-allocate all memory OUTSIDE eigs
-    if use_gpu
-        Adt = gpuArray(A * dt);
-        x_buf    = gpuArray(zeros(n, 1));
-        vout_buf = gpuArray(zeros(n, 1));
-        term_buf = gpuArray(zeros(n, 1));
-    else
-        Adt = A * dt;
-        x_buf    = zeros(n, 1);
-        vout_buf = zeros(n, 1);
-        term_buf = zeros(n, 1);
-    end
-
-    %% Arnoldi iteration via eigs (no memory allocation inside callback)
+    %% Arnoldi iteration via eigs
     opts.tol = 1e-4;
-    opts.maxit = 40 * k;
+    opts.maxit = 40 * n_modes;
     opts.issym = false;
     t_eigs = tic;
-    [V, D, flag] = eigs(@(x) ARNOLDI_POWER_GPU(x, Adt, timesteps, use_gpu, x_buf, vout_buf, term_buf), n, k, 'LM', opts);
+    [V, D, flag] = eigs(@(x) ARNOLDI_POWER_GPU(x, prop, timesteps), size(A, 1), n_modes, 'LM', opts);
     fprintf("Eigenvalue solve time: %.6f seconds\n", toc(t_eigs));
     if flag ~= 0
         warning('eigs did not fully converge');
     end
 
-    %% GPU synchronization and memory cleanup
-    if use_gpu
-        wait(gpu);  % Synchronize GPU - catch any async errors
-        clear Adt x_buf vout_buf term_buf;
-        wait(gpu);  % Verify memory is deallocated
-        reset(gpuDevice);
-    else
-        clear Adt x_buf vout_buf term_buf;
-    end
-
     %% Convert discrete-time eigenvalues to continuous-time
-    format long
+    % log(mu) / T is known up to multiples of 2 pi i / T: frequencies above
+    % pi / T alias. The Rayleigh quotient v' A v / v' v of each eigenvector
+    % picks the branch (it is accurate to far better than pi / T).
+    T = dt * timesteps;
+    lambda = log(diag(D)) / T;
+    rayleigh = (sum(conj(V) .* (A * V), 1) ./ sum(abs(V).^2, 1)).';
+    lambda = lambda + 2i * pi / T * round((imag(rayleigh) - imag(lambda)) * T / (2 * pi));
+    D = diag(lambda);
 
-    for i = 1:k
-        D(i, i) = real(log(D(i, i)) / dt / timesteps) + 1j * imag(log(D(i, i)) / dt / timesteps);
-        fprintf("eigenvalue ")
-        fprintf("%i", i)
-        fprintf(" = ")
-        fprintf("%f + %fi", real(D(i, i)), imag(D(i, i)))
-        fprintf("\n")
+    format long
+    for i = 1:n_modes
+        fprintf("eigenvalue %i = %f + %fi\n", i, real(lambda(i)), imag(lambda(i)))
     end
 end
