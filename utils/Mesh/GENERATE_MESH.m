@@ -135,148 +135,78 @@ function s = GENERATE_MESH(s, disturbances)
         end
     end
 
-    %% Compute left-right face areas and normals
-    if s.PDE_dimension == "2D"
-        for i = 1:s.mesh.Nchi+1
-            for j = 1:s.mesh.Neta
-                s.mesh.lr_area(i,j) = sqrt((s.mesh.x_corner(i,j+1) - s.mesh.x_corner(i,j))^2 ...
-                                           + (s.mesh.y_corner(i,j+1) - s.mesh.y_corner(i,j))^2);
-                s.mesh.lr_x_normal(i,j) = -(s.mesh.y_corner(i,j+1) - s.mesh.y_corner(i,j)) / s.mesh.lr_area(i,j);
-                s.mesh.lr_y_normal(i,j) =  (s.mesh.x_corner(i,j+1) - s.mesh.x_corner(i,j)) / s.mesh.lr_area(i,j);
-                if i < s.mesh.Nchi+1
-                    sgn = sign(s.mesh.lr_x_normal(i,j) * (s.mesh.x_corner(i+1,j) - s.mesh.x_corner(i,j)) ...
-                             + s.mesh.lr_y_normal(i,j) * (s.mesh.y_corner(i+1,j) - s.mesh.y_corner(i,j)));
-                else
-                    sgn = sign(s.mesh.lr_x_normal(i,j) * (s.mesh.x_corner(i,j) - s.mesh.x_corner(i-1,j)) ...
-                             + s.mesh.lr_y_normal(i,j) * (s.mesh.y_corner(i,j) - s.mesh.y_corner(i-1,j)));
-                end
-                s.mesh.lr_x_normal(i,j) =  s.mesh.lr_x_normal(i,j) * sgn;
-                s.mesh.lr_y_normal(i,j) =  s.mesh.lr_y_normal(i,j) * sgn;
-            end
-        end
-    elseif s.PDE_dimension == "3D-axisymmetric"
-        for i = 1:s.mesh.Nchi+1
-            for j = 1:s.mesh.Neta
-                depth = abs(s.mesh.y_corner(i,j+1) + s.mesh.y_corner(i,j)) / 2 .* s.mesh.arc_3D_Dtheta_Dr;
-                edge_len = sqrt((s.mesh.x_corner(i,j+1) - s.mesh.x_corner(i,j))^2 ...
-                              + (s.mesh.y_corner(i,j+1) - s.mesh.y_corner(i,j))^2);
-                s.mesh.lr_area(i,j) = edge_len * depth;
-                s.mesh.lr_x_normal(i,j) = -(s.mesh.y_corner(i,j+1) - s.mesh.y_corner(i,j)) / edge_len;
-                s.mesh.lr_y_normal(i,j) =  (s.mesh.x_corner(i,j+1) - s.mesh.x_corner(i,j)) / edge_len;
-                if i < s.mesh.Nchi+1
-                    sgn = sign(s.mesh.lr_x_normal(i,j) * (s.mesh.x_corner(i+1,j) - s.mesh.x_corner(i,j)) ...
-                             + s.mesh.lr_y_normal(i,j) * (s.mesh.y_corner(i+1,j) - s.mesh.y_corner(i,j)));
-                else
-                    sgn = sign(s.mesh.lr_x_normal(i,j) * (s.mesh.x_corner(i,j) - s.mesh.x_corner(i-1,j)) ...
-                             + s.mesh.lr_y_normal(i,j) * (s.mesh.y_corner(i,j) - s.mesh.y_corner(i-1,j)));
-                end
-                s.mesh.lr_x_normal(i,j) =  s.mesh.lr_x_normal(i,j) * sgn;
-                s.mesh.lr_y_normal(i,j) =  s.mesh.lr_y_normal(i,j) * sgn;
-            end
-        end
-    else
+    %% Face areas, normals and cell volumes (vectorized over the mesh)
+    if ~ismember(s.PDE_dimension, ["2D", "3D-axisymmetric"])
         error("Dimension selection not recognized")
     end
+    axisymmetric = s.PDE_dimension == "3D-axisymmetric";
+    xc = s.mesh.x_corner;
+    yc = s.mesh.y_corner;
+    arc = s.mesh.arc_3D_Dtheta_Dr;
 
-    %% Compute bottom-top face areas and normals
-    if s.PDE_dimension == "2D"
-        for i = 1:s.mesh.Nchi
-            for j = 1:s.mesh.Neta+1
-                s.mesh.bt_area(i,j) = sqrt((s.mesh.x_corner(i+1,j) - s.mesh.x_corner(i,j))^2 ...
-                                           + (s.mesh.y_corner(i+1,j) - s.mesh.y_corner(i,j))^2);
-                s.mesh.bt_x_normal(i,j) =  (s.mesh.y_corner(i+1,j) - s.mesh.y_corner(i,j)) / s.mesh.bt_area(i,j);
-                s.mesh.bt_y_normal(i,j) = -(s.mesh.x_corner(i+1,j) - s.mesh.x_corner(i,j)) / s.mesh.bt_area(i,j);
-                if j < s.mesh.Neta+1
-                    sgn = sign(s.mesh.bt_x_normal(i,j) * (s.mesh.x_corner(i,j+1) - s.mesh.x_corner(i,j)) ...
-                             + s.mesh.bt_y_normal(i,j) * (s.mesh.y_corner(i,j+1) - s.mesh.y_corner(i,j)));
-                else
-                    sgn = sign(s.mesh.bt_x_normal(i,j) * (s.mesh.x_corner(i,j) - s.mesh.x_corner(i,j-1)) ...
-                             + s.mesh.bt_y_normal(i,j) * (s.mesh.y_corner(i,j) - s.mesh.y_corner(i,j-1)));
-                end
-                s.mesh.bt_x_normal(i,j) =  s.mesh.bt_x_normal(i,j) * sgn;
-                s.mesh.bt_y_normal(i,j) =  s.mesh.bt_y_normal(i,j) * sgn;
-            end
-        end
-    elseif s.PDE_dimension == "3D-axisymmetric"
-        for i = 1:s.mesh.Nchi
-            for j = 1:s.mesh.Neta+1
-                depth = abs(s.mesh.y_corner(i+1,j) + s.mesh.y_corner(i,j)) / 2 .* s.mesh.arc_3D_Dtheta_Dr;
-                edge_len = sqrt((s.mesh.x_corner(i+1,j) - s.mesh.x_corner(i,j))^2 ...
-                              + (s.mesh.y_corner(i+1,j) - s.mesh.y_corner(i,j))^2);
-                s.mesh.bt_area(i,j) = edge_len * depth;
-                s.mesh.bt_x_normal(i,j) =  (s.mesh.y_corner(i+1,j) - s.mesh.y_corner(i,j)) / edge_len;
-                s.mesh.bt_y_normal(i,j) = -(s.mesh.x_corner(i+1,j) - s.mesh.x_corner(i,j)) / edge_len;
-                if j < s.mesh.Neta+1
-                    sgn = sign(s.mesh.bt_x_normal(i,j) * (s.mesh.x_corner(i,j+1) - s.mesh.x_corner(i,j)) ...
-                             + s.mesh.bt_y_normal(i,j) * (s.mesh.y_corner(i,j+1) - s.mesh.y_corner(i,j)));
-                else
-                    sgn = sign(s.mesh.bt_x_normal(i,j) * (s.mesh.x_corner(i,j) - s.mesh.x_corner(i,j-1)) ...
-                             + s.mesh.bt_y_normal(i,j) * (s.mesh.y_corner(i,j) - s.mesh.y_corner(i,j-1)));
-                end
-                s.mesh.bt_x_normal(i,j) =  s.mesh.bt_x_normal(i,j) * sgn;
-                s.mesh.bt_y_normal(i,j) =  s.mesh.bt_y_normal(i,j) * sgn;
-            end
-        end
+    %% Left-right faces: edges from corner (i,j) to (i,j+1), normals towards +i
+    dx = xc(:, 2:end) - xc(:, 1:end-1);
+    dy = yc(:, 2:end) - yc(:, 1:end-1);
+    edge_len = sqrt(dx.^2 + dy.^2);
+    nx = -dy ./ edge_len;
+    ny =  dx ./ edge_len;
+    di_x = xc(2:end, 1:end-1) - xc(1:end-1, 1:end-1);   % corner step along +i
+    di_y = yc(2:end, 1:end-1) - yc(1:end-1, 1:end-1);
+    sgn = sign(nx .* [di_x; di_x(end, :)] + ny .* [di_y; di_y(end, :)]);
+    s.mesh.lr_x_normal = nx .* sgn;
+    s.mesh.lr_y_normal = ny .* sgn;
+    if axisymmetric
+        s.mesh.lr_area = edge_len .* (abs(yc(:, 2:end) + yc(:, 1:end-1)) / 2 .* arc);
     else
-        error("Dimension selection not recognized")
+        s.mesh.lr_area = edge_len;
     end
 
-    %% Compute front-back face areas (3D-axisymmetric only)
-    if s.PDE_dimension == "3D-axisymmetric"
-        for i = 1:s.mesh.Nchi
-            for j = 1:s.mesh.Neta
-                % Front-back area equals the 2D cell area (Shoelace formula)
-                s.mesh.fb_area(i,j) = -s.mesh.x_corner(i,j)     * s.mesh.y_corner(i+1,j)   + s.mesh.x_corner(i+1,j)   * s.mesh.y_corner(i,j);
-                s.mesh.fb_area(i,j) = s.mesh.fb_area(i,j) - s.mesh.x_corner(i+1,j)   * s.mesh.y_corner(i+1,j+1) + s.mesh.x_corner(i+1,j+1) * s.mesh.y_corner(i+1,j);
-                s.mesh.fb_area(i,j) = s.mesh.fb_area(i,j) - s.mesh.x_corner(i+1,j+1) * s.mesh.y_corner(i,j+1)   + s.mesh.x_corner(i,j+1)   * s.mesh.y_corner(i+1,j+1);
-                s.mesh.fb_area(i,j) = s.mesh.fb_area(i,j) - s.mesh.x_corner(i,j+1)   * s.mesh.y_corner(i,j)     + s.mesh.x_corner(i,j)     * s.mesh.y_corner(i,j+1);
-                s.mesh.fb_area(i,j) = abs(s.mesh.fb_area(i,j) / 2);
-                theta_angle_fb_faces = atan(s.mesh.arc_3D_Dtheta_Dr / 2);
-                s.mesh.fb_x_normal_front =  0;
-                s.mesh.fb_y_normal_front =  sin(theta_angle_fb_faces);
-                s.mesh.fb_x_normal_back  =  0;
-                s.mesh.fb_y_normal_back  = -sin(theta_angle_fb_faces);
-            end
-        end
+    %% Bottom-top faces: edges from corner (i,j) to (i+1,j), normals towards +j
+    dx = xc(2:end, :) - xc(1:end-1, :);
+    dy = yc(2:end, :) - yc(1:end-1, :);
+    edge_len = sqrt(dx.^2 + dy.^2);
+    nx =  dy ./ edge_len;
+    ny = -dx ./ edge_len;
+    dj_x = xc(1:end-1, 2:end) - xc(1:end-1, 1:end-1);   % corner step along +j
+    dj_y = yc(1:end-1, 2:end) - yc(1:end-1, 1:end-1);
+    sgn = sign(nx .* [dj_x, dj_x(:, end)] + ny .* [dj_y, dj_y(:, end)]);
+    s.mesh.bt_x_normal = nx .* sgn;
+    s.mesh.bt_y_normal = ny .* sgn;
+    if axisymmetric
+        s.mesh.bt_area = edge_len .* (abs(yc(2:end, :) + yc(1:end-1, :)) / 2 .* arc);
+    else
+        s.mesh.bt_area = edge_len;
     end
 
-    %% Compute cell volumes
-    if s.PDE_dimension == "2D"
-        for i = 1:s.mesh.Nchi
-            for j = 1:s.mesh.Neta
-                % Shoelace formula for quadrilateral area
-                s.mesh.volume(i,j) = -s.mesh.x_corner(i,j)     * s.mesh.y_corner(i+1,j)   + s.mesh.x_corner(i+1,j)   * s.mesh.y_corner(i,j);
-                s.mesh.volume(i,j) = s.mesh.volume(i,j) - s.mesh.x_corner(i+1,j)   * s.mesh.y_corner(i+1,j+1) + s.mesh.x_corner(i+1,j+1) * s.mesh.y_corner(i+1,j);
-                s.mesh.volume(i,j) = s.mesh.volume(i,j) - s.mesh.x_corner(i+1,j+1) * s.mesh.y_corner(i,j+1)   + s.mesh.x_corner(i,j+1)   * s.mesh.y_corner(i+1,j+1);
-                s.mesh.volume(i,j) = s.mesh.volume(i,j) - s.mesh.x_corner(i,j+1)   * s.mesh.y_corner(i,j)     + s.mesh.x_corner(i,j)     * s.mesh.y_corner(i,j+1);
-                s.mesh.volume(i,j) = abs(s.mesh.volume(i,j) / 2);
-            end
-        end
-    elseif s.PDE_dimension == "3D-axisymmetric"
-        for i = 1:s.mesh.Nchi
-            for j = 1:s.mesh.Neta
-                % Compute corners of wedge volume element
-                c1 = [s.mesh.x_corner(i,j),     s.mesh.y_corner(i,j),      s.mesh.y_corner(i,j)/2     .* s.mesh.arc_3D_Dtheta_Dr];
-                c2 = [s.mesh.x_corner(i+1,j),   s.mesh.y_corner(i+1,j),    s.mesh.y_corner(i+1,j)/2   .* s.mesh.arc_3D_Dtheta_Dr];
-                c3 = [s.mesh.x_corner(i+1,j+1), s.mesh.y_corner(i+1,j+1),  s.mesh.y_corner(i+1,j+1)/2 .* s.mesh.arc_3D_Dtheta_Dr];
-                c4 = [s.mesh.x_corner(i,j+1),   s.mesh.y_corner(i,j+1),    s.mesh.y_corner(i,j+1)/2   .* s.mesh.arc_3D_Dtheta_Dr];
-                c5 = [s.mesh.x_corner(i,j),     s.mesh.y_corner(i,j),     -s.mesh.y_corner(i,j)/2     .* s.mesh.arc_3D_Dtheta_Dr];
-                c6 = [s.mesh.x_corner(i+1,j),   s.mesh.y_corner(i+1,j),   -s.mesh.y_corner(i+1,j)/2   .* s.mesh.arc_3D_Dtheta_Dr];
-                c7 = [s.mesh.x_corner(i+1,j+1), s.mesh.y_corner(i+1,j+1), -s.mesh.y_corner(i+1,j+1)/2 .* s.mesh.arc_3D_Dtheta_Dr];
-                c8 = [s.mesh.x_corner(i,j+1),   s.mesh.y_corner(i,j+1),   -s.mesh.y_corner(i,j+1)/2   .* s.mesh.arc_3D_Dtheta_Dr];
+    %% Cell area in the (x, y) plane (shoelace formula)
+    x1 = xc(1:end-1, 1:end-1);  y1 = yc(1:end-1, 1:end-1);   % corner (i,   j)
+    x2 = xc(2:end, 1:end-1);    y2 = yc(2:end, 1:end-1);     % corner (i+1, j)
+    x3 = xc(2:end, 2:end);      y3 = yc(2:end, 2:end);       % corner (i+1, j+1)
+    x4 = xc(1:end-1, 2:end);    y4 = yc(1:end-1, 2:end);     % corner (i,   j+1)
+    plane_area = -x1 .* y2 + x2 .* y1;
+    plane_area = plane_area - x2 .* y3 + x3 .* y2;
+    plane_area = plane_area - x3 .* y4 + x4 .* y3;
+    plane_area = plane_area - x4 .* y1 + x1 .* y4;
+    plane_area = abs(plane_area / 2);
 
-                % Decompose hexahedron into six tetrahedra and sum volumes
-                tet1 = tetrahedronVolume(c1, c2, c4, c6);
-                tet2 = tetrahedronVolume(c2, c6, c4, c3);
-                tet3 = tetrahedronVolume(c6, c4, c3, c7);
-                tet4 = tetrahedronVolume(c1, c4, c8, c6);
-                tet5 = tetrahedronVolume(c8, c4, c6, c7);
-                tet6 = tetrahedronVolume(c5, c1, c6, c8);
-                s.mesh.volume(i,j) = tet1 + tet2 + tet3 + tet4 + tet5 + tet6;
-            end
-        end
+    if axisymmetric
+        %% Front-back faces and wedge volumes (six tetrahedra per cell)
+        s.mesh.fb_area = plane_area;
+        theta_angle_fb_faces = atan(arc / 2);
+        s.mesh.fb_x_normal_front =  0;
+        s.mesh.fb_y_normal_front =  sin(theta_angle_fb_faces);
+        s.mesh.fb_x_normal_back  =  0;
+        s.mesh.fb_y_normal_back  = -sin(theta_angle_fb_faces);
+
+        c1 = {x1, y1,  y1/2 .* arc};  c5 = {x1, y1, -y1/2 .* arc};
+        c2 = {x2, y2,  y2/2 .* arc};  c6 = {x2, y2, -y2/2 .* arc};
+        c3 = {x3, y3,  y3/2 .* arc};  c7 = {x3, y3, -y3/2 .* arc};
+        c4 = {x4, y4,  y4/2 .* arc};  c8 = {x4, y4, -y4/2 .* arc};
+        s.mesh.volume = TETRAHEDRON_VOLUME(c1, c2, c4, c6) + TETRAHEDRON_VOLUME(c2, c6, c4, c3) ...
+            + TETRAHEDRON_VOLUME(c6, c4, c3, c7) + TETRAHEDRON_VOLUME(c1, c4, c8, c6) ...
+            + TETRAHEDRON_VOLUME(c8, c4, c6, c7) + TETRAHEDRON_VOLUME(c5, c1, c6, c8);
     else
-        error("Dimension selection not recognized")
+        s.mesh.volume = plane_area;
     end
 
     %% Compute geometry factors for CFL estimation
@@ -290,21 +220,20 @@ function s = GENERATE_MESH(s, disturbances)
     max_4 = max(s.mesh.lr_area(2:end,:) ./ s.mesh.volume ./ centroids_lr_distance(2:end,:), [], "all");
     s.mesh.geometry_factor = max(max_1, max_2);
     s.mesh.volume_factor = max(max_3, max_4);
+
+    %% Mesh coefficients of the viscous face gradients
+    s.mesh.face_gradient = FACE_GRADIENT_GEOMETRY(s.mesh);
 end
 
 
-function volume = tetrahedronVolume(p1, p2, p3, p4)
-% tetrahedronVolume  Volume of a tetrahedron from four vertex coordinates.
-%
-%   volume = tetrahedronVolume(p1, p2, p3, p4)
-%
-%   Computes the volume using the scalar triple product:
-%       V = |v1 . (v2 x v3)| / 6
-%   where v1, v2, v3 are edge vectors from p1 to the other vertices.
-
-    v1 = p2 - p1;
-    v2 = p3 - p1;
-    v3 = p4 - p1;
-
-    volume = abs(dot(v1, cross(v2, v3))) / 6;
+function volume = TETRAHEDRON_VOLUME(p1, p2, p3, p4)
+% TETRAHEDRON_VOLUME  Volume |v1 . (v2 x v3)| / 6 of the tetrahedra with
+%   vertices p1..p4, given as {x, y, z} cells of equal-size arrays.
+    v1 = cellfun(@minus, p2, p1, 'UniformOutput', false);
+    v2 = cellfun(@minus, p3, p1, 'UniformOutput', false);
+    v3 = cellfun(@minus, p4, p1, 'UniformOutput', false);
+    cross_x = v2{2} .* v3{3} - v2{3} .* v3{2};
+    cross_y = v2{3} .* v3{1} - v2{1} .* v3{3};
+    cross_z = v2{1} .* v3{2} - v2{2} .* v3{1};
+    volume = abs(v1{1} .* cross_x + v1{2} .* cross_y + v1{3} .* cross_z) / 6;
 end

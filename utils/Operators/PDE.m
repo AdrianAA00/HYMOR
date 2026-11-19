@@ -21,10 +21,7 @@ function s = PDE(s, chemistry)
 %
 %   Notes:
 %       - In linearized mode, chemistry equilibrium is not recomputed.
-%       - The 2D branch calls FLUX_MASS, FLUX_MOMENTUM, FLUX_TOTAL_ENERGY,
-%         and VISCOUS_FLUX.
-%       - The 3D-axisymmetric branch calls the _3D variants of the inviscid
-%         fluxes; VISCOUS_FLUX handles both dimensions.
+%       - FLUX_INVISCID and VISCOUS_FLUX handle both PDE dimensions.
 %       - In linearized mode with an azimuthal mode set up (s.azimuthal),
 %         APPLY_BOUNDARY_CONDITIONS_AZIMUTHAL and FLUX_AZIMUTHAL_MODE add
 %         the ghost cells and terms of the azimuthal wavenumber.
@@ -49,20 +46,10 @@ function s = PDE(s, chemistry)
     end
 
     %% Compute inviscid and viscous fluxes
-    if s.PDE_dimension == "2D"
-        s = FLUX_NON_EQUILIBRIUM_CHEMISTRY(s, chemistry);
-        s = FLUX_MASS(s);
-        s = FLUX_MOMENTUM(s);
-        s = FLUX_TOTAL_ENERGY(s);
-        s = VISCOUS_FLUX(s);
-    elseif s.PDE_dimension == "3D-axisymmetric"
-        s = FLUX_NON_EQUILIBRIUM_CHEMISTRY(s, chemistry);
-        s = FLUX_MASS_3D(s);
-        s = FLUX_MOMENTUM_3D(s);
-        s = FLUX_TOTAL_ENERGY_3D(s);
-        s = VISCOUS_FLUX(s);
-        if azimuthal_mode
-            s = FLUX_AZIMUTHAL_MODE(s);
-        end
+    s = FLUX_NON_EQUILIBRIUM_CHEMISTRY(s, chemistry);
+    s = FLUX_INVISCID(s);
+    s = VISCOUS_FLUX(s);
+    if azimuthal_mode
+        s = FLUX_AZIMUTHAL_MODE(s);
     end
 end

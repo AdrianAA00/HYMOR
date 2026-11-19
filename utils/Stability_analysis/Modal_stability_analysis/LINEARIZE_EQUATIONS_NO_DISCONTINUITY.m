@@ -36,8 +36,10 @@ function A = LINEARIZE_EQUATIONS_NO_DISCONTINUITY(s, chemistry)
 %       - Supports periodic boundary conditions (chi and/or eta pairs).
 %       - Shock perturbation blocks (A12, A21, A22) are only assembled when
 %         s.stability_analysis.perturb_shock is true.
-%       - Uses a spline_param switch to select between per-point and
-%         all-at-once shock perturbation strategies (A21 block).
+%       - A21 (flow -> shock speed) perturbs a whole row of cells next to
+%         the shock per evaluation: each shock speed depends only on its
+%         own column. A12/A22 perturb one shock point per evaluation (the
+%         smoothing spline couples the shock points).
 %       - rho_w does not enter the Rankine-Hugoniot normal jump, so its
 %         A21 columns are zero and are not evaluated.
 %       - The shock DoFs are upstream normal displacements; their rows are
@@ -83,26 +85,17 @@ function A = LINEARIZE_EQUATIONS_NO_DISCONTINUITY(s, chemistry)
         shock_rows = nv * N + (1:Nchi)';
 
         %% A21: Flow cells next to the shock -> shock speed
+        % The shock speed of a shock point depends only on the cells of its
+        % own column (the spline is fitted to the shock points, not to the
+        % cells), so a whole row of cells is perturbed in one evaluation.
         for k = 1:4
             for jj = 1:2
                 cols = (k - 1) * N + (1:Nchi)' + (cell_j - jj - 1) * Nchi;
                 idx = sub2ind(size(s.var.rho), (2:Nchi+1)', cell_j - jj + 1);
-                if s.shock.spline_param ~= 1
-                    % Spline-coupled shock points: one cell per evaluation
-                    for i = 1:Nchi
-                        s_pert = s;
-                        s_pert.var.(fields(k))(idx(i)) = s_pert.var.(fields(k))(idx(i)) + epsilon;
-                        response = FLUX_RESPONSE(s_pert, s_base, fields, epsilon, chemistry);
-                        triplets(end+1, :) = {shock_rows, repmat(cols(i), Nchi, 1), ...
-                                              response.shock_speed}; %#ok<AGROW>
-                    end
-                else
-                    % Uncoupled shock points: perturb the whole row at once
-                    s_pert = s;
-                    s_pert.var.(fields(k))(idx) = s_pert.var.(fields(k))(idx) + epsilon;
-                    response = FLUX_RESPONSE(s_pert, s_base, fields, epsilon, chemistry);
-                    triplets(end+1, :) = {shock_rows, cols, response.shock_speed}; %#ok<AGROW>
-                end
+                s_pert = s;
+                s_pert.var.(fields(k))(idx) = s_pert.var.(fields(k))(idx) + epsilon;
+                response = FLUX_RESPONSE(s_pert, s_base, fields, epsilon, chemistry);
+                triplets(end+1, :) = {shock_rows, cols, response.shock_speed}; %#ok<AGROW>
             end
         end
 

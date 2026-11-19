@@ -33,14 +33,10 @@ function s = GET_EXTENDED_CELL_CENTERS(s)
 % Part of: Hypersonics Stability MATLAB Solver - Mesh Module
 
     %% Compute interior cell centers
-    for i = 1:s.mesh.Nchi
-        for j = 1:s.mesh.Neta
-            s.mesh.x(i,j) = (s.mesh.x_corner(i,j) + s.mesh.x_corner(i+1,j) + s.mesh.x_corner(i,j+1) + s.mesh.x_corner(i+1,j+1)) / 4;
-            s.mesh.y(i,j) = (s.mesh.y_corner(i,j) + s.mesh.y_corner(i+1,j) + s.mesh.y_corner(i,j+1) + s.mesh.y_corner(i+1,j+1)) / 4;
-        end
-    end
-
-    %% Convert to element space
+    xc = s.mesh.x_corner;
+    yc = s.mesh.y_corner;
+    s.mesh.x = (xc(1:end-1, 1:end-1) + xc(2:end, 1:end-1) + xc(1:end-1, 2:end) + xc(2:end, 2:end)) / 4;
+    s.mesh.y = (yc(1:end-1, 1:end-1) + yc(2:end, 1:end-1) + yc(1:end-1, 2:end) + yc(2:end, 2:end)) / 4;
     [s.mesh.chi, s.mesh.eta] = GO_TO_ELEMENT_SPACE(s.mesh.x, s.mesh.y, s);
 
     %% Populate interior of extended arrays
