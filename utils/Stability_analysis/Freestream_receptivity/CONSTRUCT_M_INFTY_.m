@@ -16,7 +16,7 @@ function M_infty_ = CONSTRUCT_M_INFTY_(s, norms, T, w_infty, scaling_non_tempora
 %
 %   Inputs:
 %       s             - Solution structure with flow fields and mesh data
-%       norms                - 4-element logical vector [pressure, u-momentum, v-momentum, entropy]
+%       norms                - Logical vector [pressure, u-momentum, v-momentum, entropy, (w-momentum)]
 %       T                    - Time horizon for temporal scaling
 %       w_infty              - Vector of freestream disturbance frequencies
 %       scaling_non_temporal - If true, use reference time T_ref instead of T for scaling
@@ -57,101 +57,37 @@ function M_infty = CONSTRUCT_M_INFTY(s, norms, T, scaling_non_temporal)
 %
 %   Inputs:
 %       s             - Solution structure
-%       norms                - 4-element logical vector
+%       norms                - Logical vector [pressure, u, v, entropy, (w)]
 %       T                    - Time horizon
 %       scaling_non_temporal - If true, use advection time T_ref for scaling
 %
 %   Outputs:
-%       M_infty - Sparse diagonal matrix of size (4*Nx x 4*Nx)
+%       M_infty - Sparse diagonal matrix of size (nv*Nx x nv*Nx)
 
     %% Extract freestream quantities
     Nx = s.mesh.Nchi;
-    Ny = s.mesh.Neta;
     gamma_star = s.freestream.gamma_star * ones(Nx, 1);
     p = s.freestream.p_0 * ones(Nx, 1);
     rho = s.freestream.rho_0 * ones(Nx, 1);
-    u = s.freestream.rho_u_0 / s.freestream.rho_0 * ones(Nx, 1);
-    v = s.freestream.rho_v_0 / s.freestream.rho_0 * ones(Nx, 1);
     a = s.freestream.a_0 * ones(Nx, 1);
-    volume = s.mesh.volume;
-    flow_cells = s.shock.flow_cells;
-    indices = reshape(1:Nx, Nx, 1);
 
-    %% Compute shock arc lengths and post-shock volume
-    shock_arc_length = zeros(Nx, 1);
-    total_arc_length = 0;
-    total_post_shock_volume = 0;
-    volume_advect = zeros(Nx, 1);
-
-    % Freestream unit direction (generic, works for any U, V freestream)
+    %% Shock arc length projected normal to the freestream
     V_inf_mag = sqrt(s.freestream.rho_u_0^2 + s.freestream.rho_v_0^2);
     u_hat = s.freestream.rho_u_0 / V_inf_mag;
     v_hat = s.freestream.rho_v_0 / V_inf_mag;
+    shock_faces = sub2ind(size(s.mesh.bt_area), (1:Nx)', s.shock.cell_indices(:, 1));
+    proj = s.mesh.bt_x_normal(shock_faces) * u_hat + s.mesh.bt_y_normal(shock_faces) * v_hat;
+    shock_arc_length = s.mesh.bt_area(shock_faces) .* abs(proj);
 
-    for i = 1:Nx
-        j = s.shock.cell_indices(i, 1);
-        proj = s.mesh.bt_x_normal(i, j) * u_hat + s.mesh.bt_y_normal(i, j) * v_hat;
-        shock_arc_length(i) = s.mesh.bt_area(i, j) * abs(proj);
-        total_arc_length = total_arc_length + shock_arc_length(i);
-    end
-    for i = 1:Nx
-        for j = 1:Ny
-            total_post_shock_volume = total_post_shock_volume + volume(i, j) * flow_cells(i, j);
-        end
-        volume_advect(i, 1) = total_post_shock_volume;
-    end
-
-    %% Determine scaling factor
+    %% Time scaling
     if scaling_non_temporal
-        T_ref = GET_T_REF(s);
-        scaling = T_ref;
+        scaling = GET_T_REF(s);
     else
         scaling = T;
     end
 
-    %% Initialize storage for sparse triplets
-    M = zeros(4, Nx);
-    M_m = zeros(4, Nx);
-    M_n = zeros(4, Nx);
-
-    %% Pressure norm contribution
-    if norms(1) == true
-        M(1, :) = rho .* a.^2 ./ (2 .* (gamma_star .* p).^2) .* shock_arc_length * scaling;
-        M_n(1, :) = 0*Nx + indices;
-        M_m(1, :) = 0*Nx + indices;
-    end
-
-    %% X-momentum norm contribution
-    if norms(2) == true
-        M(2, :, :) = rho/2 .* shock_arc_length * scaling;
-        M_n(2, :, :) = 1*Nx + indices;
-        M_m(2, :, :) = 1*Nx + indices;
-    end
-
-    %% Y-momentum norm contribution
-    if norms(3) == true
-        M(3, :, :) = rho/2 .* shock_arc_length * scaling;
-        M_n(3, :, :) = 2*Nx + indices;
-        M_m(3, :, :) = 2*Nx + indices;
-    end
-
-    %% Entropy norm contribution
-    if norms(4) == true
-        M(4, :, :) = (gamma_star - 1) .* p ./ (2 * gamma_star) .* shock_arc_length * scaling;
-        M_n(4, :, :) = 3*Nx + indices;
-        M_m(4, :, :) = 3*Nx + indices;
-    end
-
-    %% Assemble sparse matrix from triplets
-    values = M(:);
-    vector_indices_m = M_m(:);
-    vector_indices_n = M_n(:);
-
-    % Keep only non-zero index entries
-    mask = (vector_indices_m ~= 0) & (vector_indices_n ~= 0);
-    values = values(mask);
-    vector_indices_m = vector_indices_m(mask);
-    vector_indices_n = vector_indices_n(mask);
-
-    M_infty = sparse(vector_indices_m, vector_indices_n, values, 4*Nx, 4*Nx, size(vector_indices_m, 1));
+    %% Chu weights of the upstream state
+    W = CHU_NORM_WEIGHTS(rho, a, gamma_star, p, norms, numel(PERTURBATION_FIELDS(s)));
+    values = W .* shock_arc_length * scaling;
+    M_infty = spdiags(values(:), 0, numel(values), numel(values));
 end

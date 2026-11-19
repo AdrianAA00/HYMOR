@@ -454,8 +454,42 @@ function s = UPDATE_SHOCK_JUMP_PROPERTIES_PRESSURE_3(s, chemistry)
         s.var.cv_star(idx_update) = -slope_cv_star .* dist0s + cv_s;
     end
 
+    %% Azimuthal momentum of an azimuthal mode
+    if isfield(s, 'azimuthal')
+        rho_w_s = AZIMUTHAL_MOMENTUM_SHOCK(s, rho_s, rho_inf, normal_velocity_inf - normal_velocity_s);
+        slope_rho_w = (s.var.rho_w(idx_v1) - s.var.rho_w(idx_v2)) ./ dist12;
+        s.var.rho_w(idx_update) = -slope_rho_w .* dist0s + rho_w_s;
+    end
+
     %% Extrapolate to ghost cells
     s = EXTRAPOLATE_CELLS_SHOCK(s);
+end
+
+%% ========================================================================
+%  Azimuthal Momentum Behind the Shock (azimuthal modes)
+%  ========================================================================
+function rho_w_s = AZIMUTHAL_MOMENTUM_SHOCK(s, rho_s, rho_inf, jump_normal_velocity)
+% AZIMUTHAL_MOMENTUM_SHOCK  Post-shock azimuthal momentum of an azimuthal mode.
+%   The tangential velocity is continuous across the shock, so the
+%   azimuthal velocity jumps only through the azimuthal tilt of the shock
+%   normal. For a normal shock displacement eta*cos(m*theta) the normal
+%   gains n_theta = -(1/r) d_theta(eta) = (m/r) eta sin(m*theta), and
+%       w_s = w_inf - (u_n,inf - u_n,s) * (m / r_s) * eta.
+%   eta is the displacement of each shock point from the base shock along
+%   the downstream base normal (sin(beta), -cos(beta)), measured from the
+%   point positions (the shock DoF of the linearization is the upstream
+%   displacement, -eta).
+
+    base = s.azimuthal.base;
+    eta = (s.shock.points_x - base.shock_x) .* sin(base.shock_beta) ...
+        - (s.shock.points_y - base.shock_y) .* cos(base.shock_beta);
+    if isfield(s, 'rho_0_upstream_p')        % prescribed upstream state (receptivity)
+        w_inf = s.freestream.rho_w_0_p ./ rho_inf;
+    else
+        w_inf = 0;
+    end
+    w_s = w_inf - jump_normal_velocity .* s.azimuthal.m ./ s.shock.points_y .* eta;
+    rho_w_s = rho_s .* w_s;
 end
 
 %% ========================================================================

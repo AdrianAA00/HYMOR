@@ -44,7 +44,7 @@ function s = VERIFY_INPUT_DATA(s)
 %       - Periodic BCs require matching on opposite boundaries and grid
 %         dimensions divisible by 3.
 %       - Supported boundary types: "circle", "lid_driven_cavity",
-%         "channel", "MSL", "blunt_cone".
+%         "channel", "pipe", "MSL", "blunt_cone".
 %       - Supported BC names: 'inflow_subsonic', 'inflow_supersonic',
 %         'periodic', 'shock', 'outflow_supersonic', 'outflow_subsonic',
 %         'outflow_NRCBC', 'no_slip_adiabatic', 'no_slip_isothermal',
@@ -169,7 +169,7 @@ function s = VERIFY_INPUT_DATA(s)
     % 6. Curvilinear Mapping
     assert(isfield(s, 'curvilinear_mapping'), 'Missing field: curvilinear_mapping');
     assert(isfield(s.curvilinear_mapping, 'boundary_type'), 'Missing field: curvilinear_mapping.boundary_type');
-    assert(ismember(s.curvilinear_mapping.boundary_type, ["circle", "lid_driven_cavity", "channel", "MSL", "blunt_cone"]), 'Invalid boundary_type');
+    assert(ismember(s.curvilinear_mapping.boundary_type, ["circle", "lid_driven_cavity", "channel", "pipe", "MSL", "blunt_cone"]), 'Invalid boundary_type');
 
     if ~isfield(s.curvilinear_mapping, 'refinement_stagnation') || ~isfield(s.curvilinear_mapping.refinement_stagnation, 'state')
         s.curvilinear_mapping.refinement_stagnation.state = false;

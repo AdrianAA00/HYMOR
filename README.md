@@ -50,6 +50,8 @@ Transport properties are available through Sutherland's law or collision-integra
 
 All three analysis modes support automatic linearization of the discrete nonlinear operators (including shock perturbations in the shock-fitting formulation) and are compatible with all available thermochemical models.
 
+**Non-axisymmetric disturbances (MATLAB)** -- For 3D-axisymmetric base flows, setting `solution.stability_analysis.azimuthal_wavenumber = m` linearizes for disturbances with azimuthal wavenumber `m`: the state gains the azimuthal momentum `rho_w`, and (`rho`, `rho_u`, `rho_v`, `rho_E`) and `rho_w` are the cos(m theta) and sin(m theta) amplitudes, so the operator stays real. Modal, transient-growth and receptivity analyses run unchanged on this operator, including the azimuthal tilt of the fitted shock and the regularity conditions on the symmetry axis. Sweeping `m` only requires re-running `LINEARIZE_L` (see the pipe-flow tutorial).
+
 ## Repository Structure
 
 ```
@@ -60,6 +62,7 @@ HYMOR/
 │   └── shock_jump_properties/        Rankine--Hugoniot property data
 ├── tutorials/                        Example cases (see Tutorials section below)
 │   ├── channel_flow/                 Incompressible channel flow (validation)
+│   ├── pipe_flow/                    Pipe flow, non-axisymmetric disturbances (validation)
 │   ├── hypersonic_cylinder/          Hypersonic flow over a cylinder
 │   └── hypersonic_blunt_cone/        Entry capsule with real-gas effects
 └── utils/                            Core solver modules
@@ -195,6 +198,7 @@ Each tutorial directory contains driver scripts (`main.m` / `main.jl`), configur
 | Tutorial | Description | Link |
 |----------|-------------|------|
 | Channel Flow | Incompressible channel flow stability analysis -- simplest starting point for validating the solver against reference eigenvalues and eigenmodes | [tutorials/channel_flow](tutorials/channel_flow/) |
+| Pipe Flow (MATLAB) | Hagen--Poiseuille flow with non-axisymmetric disturbances: sweep of the azimuthal wavenumber, modal and transient-growth analyses validated against a spectral reference | [tutorials/pipe_flow](tutorials/pipe_flow/) |
 | Hypersonic Cylinder | Hypersonic flow over a cylinder with shock fitting and modal stability analysis | [tutorials/hypersonic_cylinder](tutorials/hypersonic_cylinder/) |
 | Hypersonic Entry Capsule | Entry capsule with real-gas thermochemistry, shock fitting, and full stability pipeline | [tutorials/hypersonic_blunt_cone](tutorials/hypersonic_blunt_cone/) |
 
@@ -223,7 +227,7 @@ All simulation parameters are defined in the input file (`input_file.m` for MATL
 - **Thermochemistry**: `solution.chemistry` (model type, atmospheric composition)
 - **Shock fitting**: `solution.shock` (enable/disable, spline method, relaxation)
 - **Time integration**: `solution.time_integration` (scheme, CFL, number of iterations)
-- **Stability analysis**: `solution.stability_analysis` (eigensolver, perturbation magnitude)
+- **Stability analysis**: `solution.stability_analysis` (eigensolver, perturbation magnitude, azimuthal wavenumber)
 
 ## References
 

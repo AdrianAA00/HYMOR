@@ -21,6 +21,10 @@ function [s, L] = LINEARIZE_L(s, chemistry)
 %                  analysis nor transient growth analysis is requested.
 %
 %   Notes:
+%       - With s.stability_analysis.azimuthal_wavenumber = m (3D-axisymmetric)
+%         L is the operator of the azimuthal mode m; the returned s keeps
+%         the set-up (s.azimuthal, SETUP_AZIMUTHAL_MODE) that the norms,
+%         transient-growth and receptivity routines read.
 %       - The mesh is verified to follow the shock before linearization via
 %         CHECK_MESH_FOLLOWS_SHOCK.
 %       - Chemistry equilibrium state is updated before constructing L.
@@ -51,6 +55,9 @@ function [s, L] = LINEARIZE_L(s, chemistry)
         s = CHECK_MESH_FOLLOWS_SHOCK(s, chemistry);
     end
     s = UPDATE_CHEMISTRY_EQUILIBRIUM(s, chemistry);
+
+    %% Azimuthal mode (adds rho_w when stability_analysis.azimuthal_wavenumber is set)
+    s = SETUP_AZIMUTHAL_MODE(s, chemistry);
 
     %% Construct Jacobian via finite differences
     tic

@@ -1,194 +1,107 @@
 function s = VISCOUS_FLUX(s)
-% VISCOUS_FLUX  Compute 2D viscous flux contributions for momentum and energy equations.
+% VISCOUS_FLUX  Compute viscous flux contributions for momentum and energy equations.
 %
 %   s = VISCOUS_FLUX(s)
 %
-%   Evaluates viscous stress tensor components and heat flux on a general
-%   non-orthogonal quadrilateral mesh using non-orthogonal correction.
-%   Velocity and temperature gradients are decomposed into normal and
-%   tangential components at each cell face. The viscous stress work and
-%   Fourier heat conduction are added to the energy flux.
+%   Evaluates the viscous stress tensor and the heat flux on every face of
+%   a general (non-orthogonal) quadrilateral mesh and adds their face
+%   integrals to the momentum and energy fluxes. Velocity and temperature
+%   gradients come from FACE_GRADIENTS (exact for linear fields). The
+%   viscous stress work and Fourier heat conduction are added to the
+%   energy flux.
+%
+%   For PDE_dimension = "3D-axisymmetric" (y = r, v the radial velocity)
+%   the face areas and volumes of the mesh carry the radius, the divergence
+%   gains v/r and the hoop stress tau_theta_theta = mu (2 v/r - 2/3 div)
+%   enters the radial momentum as the source -tau_theta_theta / r.
 %
 %   Inputs:
 %       s - Solution struct containing:
-%                  .var.rho, .var.rho_u, .var.rho_v, .var.rho_E - Conserved variables
-%                  .mesh.x_Ext, .mesh.y_Ext       - Extended cell centroid coordinates
-%                  .mesh.x_corner, .mesh.y_corner - Cell corner coordinates
-%                  .mesh.bt_x_normal, .mesh.bt_y_normal - Bottom-top face unit normals
-%                  .mesh.lr_x_normal, .mesh.lr_y_normal - Left-right face unit normals
-%                  .mesh.bt_area, .mesh.lr_area   - Face areas
-%                  .bt_length, .lr_length         - Face lengths
-%                  .mesh.volume                   - Cell volumes
-%                  .var.mu_star                   - Dynamic viscosity field
-%                  .var.k_star                    - Thermal conductivity field
-%                  .var.T                         - Temperature field
-%                  .freestream.*                  - Non-dimensionalization parameters
+%                  .var.rho, .var.rho_u, .var.rho_v - Conserved variables
+%                  .var.mu_star, .var.k_star       - Viscosity and conductivity
+%                  .var.T                          - Temperature field
+%                  .mesh.*                         - Centroids, corners, face
+%                                                    normals, areas, volumes
+%                  .PDE_dimension                  - "2D" or "3D-axisymmetric"
+%                  .freestream.*                   - Non-dimensionalization parameters
 %
 %   Outputs:
 %       s - Updated s struct with viscous contributions added
 %                  to .flux.rho_u, .flux.rho_v, and .flux.rho_E
 %
 %   Notes:
-%       - Uses non-orthogonal correction for gradient reconstruction.
 %       - The viscous tensor uses the deviatoric form with the 2/3
 %         divergence term.
-%       - Heat flux is computed via Fourier's law with corrected normal
-%         temperature gradients.
+%       - v/r on a face is the mean of v/r in the two adjacent cells, so it
+%         stays finite on faces lying on the symmetry axis; the hoop stress
+%         uses v/r of the cell itself.
 %
 % Part of: Hypersonics Stability MATLAB Solver - Operators Module
 
-    %% Pre-calculate velocity fields at cell centers
+    mesh = s.mesh;
+    Re_infty = s.freestream.Re;
+    axisymmetric = s.PDE_dimension == "3D-axisymmetric";
+
+    %% Face gradients of velocity and temperature
     u = s.var.rho_u ./ s.var.rho;
     v = s.var.rho_v ./ s.var.rho;
-
-    %% Velocity values at cell corners (4-point average)
-    u_cell_corners = s.var.rho_u ./ s.var.rho;
-    v_cell_corners = s.var.rho_v ./ s.var.rho;
-
-    u_c = (u_cell_corners(1:end-1, 1:end-1) + u_cell_corners(2:end, 1:end-1) + ...
-           u_cell_corners(1:end-1, 2:end)   + u_cell_corners(2:end, 2:end)) / 4;
-    v_c = (v_cell_corners(1:end-1, 1:end-1) + v_cell_corners(2:end, 1:end-1) + ...
-           v_cell_corners(1:end-1, 2:end)   + v_cell_corners(2:end, 2:end)) / 4;
-
-    %% Distances between cell centroids
-    centroids_bt_distance = sqrt((s.mesh.y_Ext(2:end-1, 2:end) - s.mesh.y_Ext(2:end-1, 1:end-1)).^2 + ...
-                                 (s.mesh.x_Ext(2:end-1, 2:end) - s.mesh.x_Ext(2:end-1, 1:end-1)).^2);
-    centroids_lr_distance = sqrt((s.mesh.y_Ext(2:end, 2:end-1) - s.mesh.y_Ext(1:end-1, 2:end-1)).^2 + ...
-                                 (s.mesh.x_Ext(2:end, 2:end-1) - s.mesh.x_Ext(1:end-1, 2:end-1)).^2);
-
-    %% Edge lengths of cell faces
-    bt_distance = sqrt((s.mesh.x_corner(2:end, :) - s.mesh.x_corner(1:end-1, :)).^2 + ...
-                       (s.mesh.y_corner(2:end, :) - s.mesh.y_corner(1:end-1, :)).^2);
-    lr_distance = sqrt((s.mesh.x_corner(:, 2:end) - s.mesh.x_corner(:, 1:end-1)).^2 + ...
-                       (s.mesh.y_corner(:, 2:end) - s.mesh.y_corner(:, 1:end-1)).^2);
-
-    %% Unit vector components for non-orthogonal correction
-    c1_x = -(s.mesh.x_Ext(2:end, 2:end-1) - s.mesh.x_Ext(1:end-1, 2:end-1)) ./ centroids_lr_distance;
-    c1_y = -(s.mesh.y_Ext(2:end, 2:end-1) - s.mesh.y_Ext(1:end-1, 2:end-1)) ./ centroids_lr_distance;
-    c2_x =  (s.mesh.x_Ext(2:end-1, 2:end) - s.mesh.x_Ext(2:end-1, 1:end-1)) ./ centroids_bt_distance;
-    c2_y =  (s.mesh.y_Ext(2:end-1, 2:end) - s.mesh.y_Ext(2:end-1, 1:end-1)) ./ centroids_bt_distance;
-
-    %% Projection matrices for reference system transformation
-    Ct2_Fn2 = zeros(size(s.mesh.bt_x_normal));
-    Ct2_Ft2 = ones(size(s.mesh.bt_x_normal));
-    Cn2_Fn2 = c2_x .* s.mesh.bt_x_normal + c2_y .* s.mesh.bt_y_normal;
-    Cn2_Ft2 = c2_x .* s.mesh.bt_y_normal - c2_y .* s.mesh.bt_x_normal;
-
-    Cn1_Fn1 = -c1_x .* s.mesh.lr_x_normal - c1_y .* s.mesh.lr_y_normal;
-    Cn1_Ft1 =  c1_x .* s.mesh.lr_y_normal - c1_y .* s.mesh.lr_x_normal;
-    Ct1_Fn1 = zeros(size(s.mesh.lr_x_normal));
-    Ct1_Ft1 = ones(size(s.mesh.lr_y_normal));
-
-    %% Velocity derivatives along cell-center lines
-    du_dc2 =  (u(2:end-1, 2:end) - u(2:end-1, 1:end-1)) ./ centroids_bt_distance;
-    dv_dc2 =  (v(2:end-1, 2:end) - v(2:end-1, 1:end-1)) ./ centroids_bt_distance;
-    du_dc1 = -(u(2:end, 2:end-1) - u(1:end-1, 2:end-1)) ./ centroids_lr_distance;
-    dv_dc1 = -(v(2:end, 2:end-1) - v(1:end-1, 2:end-1)) ./ centroids_lr_distance;
-
-    %% Tangential velocity derivatives at faces
-    du_dt2 = -(u_c(2:end, :) - u_c(1:end-1, :)) ./ bt_distance;
-    dv_dt2 = -(v_c(2:end, :) - v_c(1:end-1, :)) ./ bt_distance;
-    du_dt1 =  (u_c(:, 2:end) - u_c(:, 1:end-1)) ./ lr_distance;
-    dv_dt1 =  (v_c(:, 2:end) - v_c(:, 1:end-1)) ./ lr_distance;
-
-    %% Normal derivatives at face 2 (bottom-top faces)
-    divide = Ct2_Fn2 .* Cn2_Ft2 - Cn2_Fn2 .* Ct2_Ft2;
-    du_dn2 = (Cn2_Ft2 .* du_dt2 - du_dc2 .* Ct2_Ft2) ./ divide;
-    dv_dn2 = (Cn2_Ft2 .* dv_dt2 - dv_dc2 .* Ct2_Ft2) ./ divide;
-
-    %% Transform to local coordinate system (n2, t2) at face 2
-    dut_dt2 = du_dt2 .* s.mesh.bt_y_normal - dv_dt2 .* s.mesh.bt_x_normal;
-    dun_dt2 = du_dt2 .* s.mesh.bt_x_normal + dv_dt2 .* s.mesh.bt_y_normal;
-    dut_dn2 = du_dn2 .* s.mesh.bt_y_normal - dv_dn2 .* s.mesh.bt_x_normal;
-    dun_dn2 = du_dn2 .* s.mesh.bt_x_normal + dv_dn2 .* s.mesh.bt_y_normal;
-
-    %% Normal derivatives at face 1 (left-right faces)
-    divide = Cn1_Fn1 .* Ct1_Ft1 - Ct1_Fn1 .* Cn1_Ft1;
-    du_dn1 = (Ct1_Ft1 .* du_dc1 - du_dt1 .* Cn1_Ft1) ./ divide;
-    dv_dn1 = (Ct1_Ft1 .* dv_dc1 - dv_dt1 .* Cn1_Ft1) ./ divide;
-
-    %% Transform to local coordinate system (n1, t1) at face 1
-    dun_dn1 = -du_dn1 .* s.mesh.lr_x_normal - dv_dn1 .* s.mesh.lr_y_normal;
-    dut_dn1 =  du_dn1 .* s.mesh.lr_y_normal - dv_dn1 .* s.mesh.lr_x_normal;
-    dun_dt1 = -du_dt1 .* s.mesh.lr_x_normal - dv_dt1 .* s.mesh.lr_y_normal;
-    dut_dt1 =  du_dt1 .* s.mesh.lr_y_normal - dv_dt1 .* s.mesh.lr_x_normal;
+    [gu, gv, gT] = FACE_GRADIENTS(mesh, u, v, s.var.T);
 
     %% Face-averaged viscosity (non-dimensionalized)
-    mu_1 = (s.var.mu_star(2:end, 2:end-1) + s.var.mu_star(1:end-1, 2:end-1)) / 2;
-    mu_2 = (s.var.mu_star(2:end-1, 2:end) + s.var.mu_star(2:end-1, 1:end-1)) / 2;
+    mu_lr = FACE_LR(s.var.mu_star) / Re_infty;
+    mu_bt = FACE_BT(s.var.mu_star) / Re_infty;
 
-    %% Viscous stress tensor (deviatoric form)
-    Re_infty = s.freestream.Re;
-    div_1 = dut_dt1 + dun_dn1;
-    tau_11 = mu_1/Re_infty .* (2 * dun_dn1 - 2/3 * div_1);
-    tau_12 = mu_1/Re_infty .* (dun_dt1 + dut_dn1);
-    div_2 = dut_dt2 + dun_dn2;
-    tau_22 = mu_2/Re_infty .* (2 * dun_dn2 - 2/3 * div_2);
-    tau_21 = mu_2/Re_infty .* (dut_dn2 + dun_dt2);
+    %% Velocity divergence on the faces
+    div_lr = gu.x_lr + gv.y_lr;
+    div_bt = gu.x_bt + gv.y_bt;
+    if axisymmetric
+        v_over_r = v ./ mesh.y_Ext;      % cell centroids, ghosts included, never on r = 0
+        div_lr = div_lr + FACE_LR(v_over_r);
+        div_bt = div_bt + FACE_BT(v_over_r);
+    end
 
-    %% Viscous stress in global (x-y) coordinates
-    tau_1x = -(tau_11 .* s.mesh.lr_x_normal - tau_12 .* s.mesh.lr_y_normal);
-    tau_1y = -(tau_11 .* s.mesh.lr_y_normal + tau_12 .* s.mesh.lr_x_normal);
-    tau_2x =  (tau_22 .* s.mesh.bt_x_normal + tau_21 .* s.mesh.bt_y_normal);
-    tau_2y =  (tau_22 .* s.mesh.bt_y_normal - tau_21 .* s.mesh.bt_x_normal);
+    %% Viscous traction tau . n on every face (normal towards increasing index)
+    [tx_lr, ty_lr] = TRACTION(mu_lr, gu.x_lr, gu.y_lr, gv.x_lr, gv.y_lr, div_lr, mesh.lr_x_normal, mesh.lr_y_normal);
+    [tx_bt, ty_bt] = TRACTION(mu_bt, gu.x_bt, gu.y_bt, gv.x_bt, gv.y_bt, div_bt, mesh.bt_x_normal, mesh.bt_y_normal);
 
-    %% Viscous momentum flux (x-direction)
-    rho_u_temp = (tau_1x(1:end-1, :) .* s.mesh.lr_area(1:end-1, :) - tau_1x(2:end, :) .* s.mesh.lr_area(2:end, :)) + ...
-                 (tau_2x(:, 2:end)   .* s.mesh.bt_area(:, 2:end)   - tau_2x(:, 1:end-1) .* s.mesh.bt_area(:, 1:end-1));
-    s.flux.rho_u = s.flux.rho_u + rho_u_temp ./ s.mesh.volume;
+    %% Viscous momentum flux
+    s.flux.rho_u = s.flux.rho_u + FACE_DIVERGENCE(tx_lr .* mesh.lr_area, tx_bt .* mesh.bt_area, mesh);
+    s.flux.rho_v = s.flux.rho_v + FACE_DIVERGENCE(ty_lr .* mesh.lr_area, ty_bt .* mesh.bt_area, mesh);
 
-    %% Viscous momentum flux (y-direction)
-    rho_v_temp = (tau_1y(1:end-1, :) .* s.mesh.lr_area(1:end-1, :) - tau_1y(2:end, :) .* s.mesh.lr_area(2:end, :)) + ...
-                 (tau_2y(:, 2:end)   .* s.mesh.bt_area(:, 2:end)   - tau_2y(:, 1:end-1) .* s.mesh.bt_area(:, 1:end-1));
-    s.flux.rho_v = s.flux.rho_v + rho_v_temp ./ s.mesh.volume;
+    %% Hoop stress (axisymmetric): tau_tt = mu (2 v/r - 2/3 div) in the cell
+    if axisymmetric
+        tau_theta_theta = HOOP_STRESS(s.var.mu_star(2:end-1, 2:end-1) / Re_infty, gu, gv, ...
+                                      v_over_r(2:end-1, 2:end-1));
+        s.flux.rho_v = s.flux.rho_v - tau_theta_theta ./ mesh.y;
+    end
 
     %% Viscous work (stress power) contribution to energy flux
-    inv_rho_1 = 1 ./ (s.var.rho(1:end-1, 2:end-1) + s.var.rho(2:end, 2:end-1));
-    inv_rho_2 = 1 ./ (s.var.rho(2:end-1, 1:end-1) + s.var.rho(2:end-1, 2:end));
+    rho_lr = FACE_LR(s.var.rho);
+    rho_bt = FACE_BT(s.var.rho);
+    u_lr = FACE_LR(s.var.rho_u) ./ rho_lr;
+    u_bt = FACE_BT(s.var.rho_u) ./ rho_bt;
+    v_lr = FACE_LR(s.var.rho_v) ./ rho_lr;
+    v_bt = FACE_BT(s.var.rho_v) ./ rho_bt;
+    s.flux.rho_E = s.flux.rho_E + FACE_DIVERGENCE((u_lr .* tx_lr + v_lr .* ty_lr) .* mesh.lr_area, ...
+                                                  (u_bt .* tx_bt + v_bt .* ty_bt) .* mesh.bt_area, mesh);
 
-    u_1 = (s.var.rho_u(1:end-1, 2:end-1) + s.var.rho_u(2:end, 2:end-1)) .* inv_rho_1;
-    u_2 = (s.var.rho_u(2:end-1, 1:end-1) + s.var.rho_u(2:end-1, 2:end)) .* inv_rho_2;
-    v_1 = (s.var.rho_v(1:end-1, 2:end-1) + s.var.rho_v(2:end, 2:end-1)) .* inv_rho_1;
-    v_2 = (s.var.rho_v(2:end-1, 1:end-1) + s.var.rho_v(2:end-1, 2:end)) .* inv_rho_2;
+    %% Heat flux (Fourier's law): k grad(T) . n
+    k_scale = s.freestream.gamma_star / s.freestream.Re / s.freestream.Pr;
+    k_lr = FACE_LR(s.var.k_star) * k_scale;
+    k_bt = FACE_BT(s.var.k_star) * k_scale;
+    q_lr = k_lr .* (gT.x_lr .* mesh.lr_x_normal + gT.y_lr .* mesh.lr_y_normal) .* mesh.lr_area;
+    q_bt = k_bt .* (gT.x_bt .* mesh.bt_x_normal + gT.y_bt .* mesh.bt_y_normal) .* mesh.bt_area;
+    s.flux.rho_E = s.flux.rho_E + FACE_DIVERGENCE(q_lr, q_bt, mesh);
+end
 
-    w1 = u_1 .* tau_1x + v_1 .* tau_1y;
-    w2 = u_2 .* tau_2x + v_2 .* tau_2y;
-
-    rho_E_temp = (w1(1:end-1, :) .* s.mesh.lr_area(1:end-1, :) - w1(2:end, :) .* s.mesh.lr_area(2:end, :)) + ...
-                 (w2(:, 2:end)   .* s.mesh.bt_area(:, 2:end)   - w2(:, 1:end-1) .* s.mesh.bt_area(:, 1:end-1));
-    s.flux.rho_E = s.flux.rho_E + rho_E_temp ./ s.mesh.volume;
-
-    %% Heat flux with non-orthogonal correction (Fourier's law)
-    k_bt = (s.var.k_star(2:end-1, 2:end) + s.var.k_star(2:end-1, 1:end-1)) / 2 * s.freestream.gamma_star / s.freestream.Re / s.freestream.Pr;
-    k_lr = (s.var.k_star(2:end, 2:end-1) + s.var.k_star(1:end-1, 2:end-1)) / 2 * s.freestream.gamma_star / s.freestream.Re / s.freestream.Pr;
-
-    %% Temperature at cell corners (4-point average)
-    T_cell_corners = s.var.T;
-
-    T_c = (T_cell_corners(1:end-1, 1:end-1) + T_cell_corners(2:end, 1:end-1) + ...
-           T_cell_corners(1:end-1, 2:end)   + T_cell_corners(2:end, 2:end)) / 4;
-
-    %% Temperature derivatives along cell-center lines
-    dT_dc2 =  (s.var.T(2:end-1, 2:end) - s.var.T(2:end-1, 1:end-1)) ./ centroids_bt_distance;
-    dT_dc1 = -(s.var.T(2:end, 2:end-1) - s.var.T(1:end-1, 2:end-1)) ./ centroids_lr_distance;
-
-    %% Tangential temperature derivatives at faces
-    dT_dt2 = -(T_c(2:end, :) - T_c(1:end-1, :)) ./ bt_distance;
-    dT_dt1 =  (T_c(:, 2:end) - T_c(:, 1:end-1)) ./ lr_distance;
-
-    %% Corrected normal temperature derivative at face 2
-    divide2 = Ct2_Fn2 .* Cn2_Ft2 - Cn2_Fn2 .* Ct2_Ft2;
-    dT_dn2 = (Cn2_Ft2 .* dT_dt2 - dT_dc2 .* Ct2_Ft2) ./ divide2;
-
-    %% Corrected normal temperature derivative at face 1
-    divide1 = Cn1_Fn1 .* Ct1_Ft1 - Ct1_Fn1 .* Cn1_Ft1;
-    dT_dn1 = (Ct1_Ft1 .* dT_dc1 - dT_dt1 .* Cn1_Ft1) ./ divide1;
-
-    %% Assemble heat flux and add to energy equation
-    q_n2 = k_bt .* dT_dn2;
-    q_n1 = k_lr .* dT_dn1;
-
-    rho_E_temp = (q_n2(:, 2:end) .* s.mesh.bt_area(:, 2:end) - q_n2(:, 1:end-1) .* s.mesh.bt_area(:, 1:end-1)) ...
-               - (q_n1(2:end, :) .* s.mesh.lr_area(2:end, :) - q_n1(1:end-1, :) .* s.mesh.lr_area(1:end-1, :));
-    s.flux.rho_E = s.flux.rho_E + rho_E_temp ./ s.mesh.volume;
+%% ========================================================================
+%  Viscous Traction
+%  ========================================================================
+function [tx, ty] = TRACTION(mu, ux, uy, vx, vy, div, nx, ny)
+% TRACTION  Components of tau . n for tau = mu (grad u + grad u^T - 2/3 div I).
+    txx = mu .* (2 * ux - 2/3 * div);
+    tyy = mu .* (2 * vy - 2/3 * div);
+    txy = mu .* (uy + vx);
+    tx = txx .* nx + txy .* ny;
+    ty = txy .* nx + tyy .* ny;
 end

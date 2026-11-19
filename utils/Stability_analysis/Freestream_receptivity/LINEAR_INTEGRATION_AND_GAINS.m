@@ -36,6 +36,8 @@ function max_gain = LINEAR_INTEGRATION_AND_GAINS(freestream_disturbances, v, lam
 % Part of: Hypersonics Stability MATLAB Solver - Transient Growth Freestream Module
 
     %% Time-stepping parameters
+    assert(get_amplification_only || ~isfield(s, 'azimuthal'), ...
+        'Energy budgets are not available for azimuthal modes: use get_amplification_only = true');
     orderTaylor = 5; % Order of Taylor expansion for matrix exponential approximation
 
     s = CFL_TIMESTEP(s);
