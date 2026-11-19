@@ -42,8 +42,8 @@ function PLOT_MODES_CHU_NORM(freestream_disturbances, A, s, chemistry, V, T_plot
 %       - When T_plot == 0 and freestream_disturbances is true the s
 %         is remeshed with a wider wall-normal extent so the freestream
 %         region is visible.
-%       - GPU time integration uses LINEAR_INTEGRATION_GPU (local
-%         subfunction) with a user-specified Taylor-series order.
+%       - The time advance to T_plot uses TAYLOR_STEPS, on the device
+%         USE_GPU selects it.
 %       - Scaling factors are derived from either the energy-flux inflow
 %         rate or the maximum total energy rate of change at t = 0.
 %       - All contour plots are created by CREATE_PUBLICATION_PLOT.
@@ -121,8 +121,6 @@ function PLOT_MODES_CHU_NORM(freestream_disturbances, A, s, chemistry, V, T_plot
 
     %% Time-advance perturbation on GPU (optional)
     if T_plot > 0
-        order = 5;
-
         s = CFL_TIMESTEP(s);
         t_temp = s.time_integration.dt / s.time_integration.CFL;
         n_t = round(T_plot / t_temp);
@@ -131,37 +129,13 @@ function PLOT_MODES_CHU_NORM(freestream_disturbances, A, s, chemistry, V, T_plot
         fprintf("Number timesteps = %f ", n_t)
         fprintf("\n")
 
-        %% Detect GPU availability
-        use_gpu = (gpuDeviceCount > 0);
-        n_vec = size(A, 1);
-
-        if use_gpu
-            gpu = gpuDevice;
-            disp(gpu.Name + " GPU selected.")
-            gA       = gpuArray(A * dt);
-            v_buf    = gpuArray(zeros(n_vec, 1));
-            vout_buf = gpuArray(zeros(n_vec, 1));
-            term_buf = gpuArray(zeros(n_vec, 1));
-        else
-            disp("No CUDA device found. Running on CPU.")
-            gA       = A * dt;
-            v_buf    = zeros(n_vec, 1);
-            vout_buf = zeros(n_vec, 1);
-            term_buf = zeros(n_vec, 1);
-        end
+        %% Device of the time stepper
+        use_gpu = USE_GPU(s, A);
 
         tic
-        [V] = LINEAR_INTEGRATION_GPU(V, n_t, order, gA, use_gpu, v_buf, vout_buf, term_buf);
+        prop = TAYLOR_PROPAGATOR(A, dt, use_gpu, false);
+        V = prop.unload(TAYLOR_STEPS(prop.load(V), prop.step, n_t));
         toc
-
-        %% GPU synchronization and memory cleanup
-        if use_gpu
-            wait(gpu);
-            clear gA v_buf vout_buf term_buf;
-            wait(gpu);
-        else
-            clear gA v_buf vout_buf term_buf;
-        end
 
         pert_rho   = real(reshape(V((0)*N_v+1:1*N_v, 1), s.mesh.Nchi, s.mesh.Neta));
         pert_rho_u = real(reshape(V((1)*N_v+1:2*N_v, 1), s.mesh.Nchi, s.mesh.Neta));
@@ -324,52 +298,6 @@ function PLOT_MODES_CHU_NORM(freestream_disturbances, A, s, chemistry, V, T_plot
 
     fprintf('All plots created successfully!\n');
 
-end
-
-
-%% ========================================================================
-%  LOCAL FUNCTION: LINEAR_INTEGRATION_GPU
-%  ========================================================================
-function [voutCPU] = LINEAR_INTEGRATION_GPU(x, n_t, order, Adt, use_gpu, v_buf, vout_buf, term_buf)
-% LINEAR_INTEGRATION_GPU  Approximate exp(A*t)*x via truncated Taylor series.
-%   Works on both GPU and CPU using pre-allocated buffers.
-%
-%   Inputs:
-%       x        - (double array) initial state vector (CPU).
-%       n_t      - (scalar) number of time steps.
-%       order    - (scalar) Taylor-series truncation order.
-%       Adt      - (gpuArray or sparse) system matrix A*dt.
-%       use_gpu  - (logical) true for GPU path, false for CPU path.
-%       v_buf    - Pre-allocated buffer for working vector.
-%       vout_buf - Pre-allocated buffer for output accumulation.
-%       term_buf - Pre-allocated buffer for Taylor term.
-%
-%   Outputs:
-%       voutCPU - (double array) final state vector (CPU).
-
-    if use_gpu
-        v_buf(:) = x;
-    else
-        v_buf(:) = x;
-    end
-    vout_buf(:) = v_buf;
-
-    for i = 1:n_t
-        factorial_val = 1;
-        for j = 1:order
-            term_buf(:) = Adt * v_buf;
-            v_buf(:) = term_buf;
-            factorial_val = j * factorial_val;
-            vout_buf(:) = vout_buf + v_buf / factorial_val;
-        end
-        v_buf(:) = vout_buf;
-    end
-
-    if use_gpu
-        voutCPU = gather(vout_buf);
-    else
-        voutCPU = vout_buf;
-    end
 end
 
 

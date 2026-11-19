@@ -85,6 +85,7 @@ solution.shock.enabled  = false;  % Enable shock fitting
 %% Stability analysis and transient growth
 solution.stability_analysis.perturbation_magnitude  = 1e-8;                    % Linearization perturbation size
 solution.stability_analysis.eigenvalue_solver       = "GPU_TIMESTEPPER_ARNOLDI"; % Eigensolver: "CPU_LU", "GPU_TIMESTEPPER_ARNOLDI"
+solution.stability_analysis.device                  = "auto";                    % Time-stepper device: "auto" (GPU for large operators), "cpu", "gpu"
 
 %% Live plots during time-marching
 solution.running_plot.enabled   = false;                    % Show live plots during simulation
