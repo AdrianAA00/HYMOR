@@ -15,6 +15,8 @@
 #       s (Dict) - Solution structure containing at minimum:
 #                    s["shock"]["spline_param"]   - Smoothing parameter,
 #                                                   uses MATLAB csaps convention: p ∈ [0, 1]
+#                                                   (set from shock.spline_smoothing for the
+#                                                   current grid by VERIFY_INPUT_DATA)
 #                    s["shock"]["points_chi"]     - (Nx x 1) parametric coordinates of shock points
 #                    s["shock"]["points_x"]/["points_y"]     - (Nx x 1) Cartesian shock coordinates
 #                    s["mesh"]["chi"]             - (Nx x Ny) grid parametric coordinates

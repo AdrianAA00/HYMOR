@@ -87,7 +87,7 @@ PLOT_INITIAL_SET_UP(solution);
 solution.restart        = false;     % Start from scratch
 solution.time_integration.N_iter   = 2000;
 solution.freestream.Re  = 10000;     % Reynolds number 
-solution.shock.spline_param        = 1 - 1e-6 * 100^3 / solution.mesh.Nchi^3; % Smoothing parameter for csaps
+solution.shock.spline_smoothing    = 1e-6; % Stronger shock smoothing on the coarse grid (rescaled to Nchi in INITIALIZATION)
 solution.mesh.Nchi = 200;  % Points along chi (wall boundary)
 solution.mesh.Neta = 40;   % Points along eta (wall-normal direction)
 solution = INITIALIZATION(solution, solution_save, chemistry);
@@ -102,7 +102,7 @@ solution_save = solution;
 solution.restart        = true;     % Start from scratch
 solution.time_integration.N_iter   = 1000;
 solution.freestream.Re  = 100000;     % Reynolds number
-solution.shock.spline_param        = 1 - 1e-8 * 100^3 / solution.mesh.Nchi^3; % Smoothing parameter for csaps
+solution.shock.spline_smoothing    = 1e-7; % Shock spline smoothing (default; rescaled to Nchi in INITIALIZATION)
 solution.mesh.Nchi = 800;  % Points along chi (wall boundary)
 solution.mesh.Neta = 100;   % Points along eta (wall-normal direction)
 solution = INITIALIZATION(solution, solution_save, chemistry);

@@ -111,7 +111,7 @@ solution["shock"]["remesh_shock_distance"]    = 1.3          # Domain boundary d
 solution["shock"]["relaxation"]               = 1.0          # Shock speed relaxation (0 = frozen, 1 = physical, <1 = under-relaxed)
 solution["shock"]["formulation"]              = "Lagrangian" # Frame formulation: "Lagrangian", "Eulerian"
 solution["shock"]["fitting"]                  = "csaps"      # Spline method: "csaps" (cubic smoothing spline)
-solution["shock"]["spline_param"]             = 1 - 1e-8 * 100^3 / solution["mesh"]["Nchi"]^3 # Smoothing parameter for csaps
+solution["shock"]["spline_smoothing"]         = 1e-7         # Shock spline smoothing: 1 - spline_param at Nchi = 100, rescaled to the grid at every INITIALIZATION (default 1e-7)
 
 ## Stability analysis and transient growth
 solution["stability_analysis"] = Dict{String, Any}()

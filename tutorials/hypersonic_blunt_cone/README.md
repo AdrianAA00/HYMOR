@@ -78,7 +78,7 @@ Generates the body-fitted curvilinear mesh around the blunted cone and initializ
 solution.restart                    = false;
 solution.time_integration.N_iter    = 2000;
 solution.freestream.Re              = 10000;
-solution.shock.spline_param         = 1 - 1e-6 * 100^3 / solution.mesh.Nchi^3;
+solution.shock.spline_smoothing     = 1e-6;
 solution.mesh.Nchi = 200;
 solution.mesh.Neta = 40;
 solution = INITIALIZATION(solution, solution_save, chemistry);
@@ -90,7 +90,7 @@ toc
 solution_save = solution;
 ```
 
-The first simulation stage uses a **coarse grid** (200 x 40) at a moderate Reynolds number (10,000). A coarser spline smoothing parameter (`1e-6`) is used for the shock surface to ensure stability on the coarse mesh. This allows the shock and flow field to establish their main features without excessive computational cost.
+The first simulation stage uses a **coarse grid** (200 x 40) at a moderate Reynolds number (10,000). A stronger shock spline smoothing (`spline_smoothing = 1e-6`, instead of the default `1e-7`) is used to ensure stability on the coarse mesh. This allows the shock and flow field to establish their main features without excessive computational cost.
 
 **Key tuning parameters:**
 | Parameter | Value | Guidance |
@@ -108,7 +108,7 @@ The first simulation stage uses a **coarse grid** (200 x 40) at a moderate Reyno
 solution.restart                    = true;
 solution.time_integration.N_iter    = 1000;
 solution.freestream.Re              = 100000;
-solution.shock.spline_param         = 1 - 1e-8 * 100^3 / solution.mesh.Nchi^3;
+solution.shock.spline_smoothing     = 1e-7;
 solution.mesh.Nchi = 800;
 solution.mesh.Neta = 100;
 solution = INITIALIZATION(solution, solution_save, chemistry);
@@ -120,7 +120,7 @@ toc
 solution_save = solution;
 ```
 
-The grid is refined to 800 x 100 and the Reynolds number is increased to 100,000. The spline smoothing parameter is tightened (`1e-8`) for the finer grid. The coarse-grid solution is interpolated onto the fine grid as the initial condition, greatly accelerating convergence.
+The grid is refined to 800 x 100 and the Reynolds number is increased to 100,000. The shock spline smoothing returns to the default (`1e-7`); it is rescaled to the new `Nchi` when `INITIALIZATION` is called, so it can be set before or after the grid size. The coarse-grid solution is interpolated onto the fine grid as the initial condition, greatly accelerating convergence.
 
 **Key tuning parameters:**
 | Parameter | Value | Guidance |
@@ -501,7 +501,7 @@ solution.shock.remesh_shock_distance = 1.2;
 solution.shock.relaxation           = 1.0;
 solution.shock.formulation          = "Lagrangian";
 solution.shock.fitting              = "csaps";
-solution.shock.spline_param         = 1 - 1e-8 * 100^3 / solution.mesh.Nchi^3;
+solution.shock.spline_smoothing     = 1e-7;
 solution.shock.initial_beta         = 55 * pi / 180;
 ```
 
@@ -510,7 +510,7 @@ solution.shock.initial_beta         = 55 * pi / 180;
 | `initial_shock_dist` | Initial guess for the shock standoff distance from the wall. | Should be close to the expected physical value. |
 | `initial_beta` | Initial shock angle guess (radians) used by the Rankine-Hugoniot solver to initialize post-shock conditions. | Should approximate the oblique shock angle for the cone. For blunt cones, values around 50-60 degrees are typical. |
 | `interpolate` | `"1st"` = first-order (robust), `"2nd"` = second-order (accurate), `"3rd"` = third-order. | Use `"1st"` during startup transients, switch to `"2nd"` or higher once the flow is established. The default in the input file is `"2nd"`. |
-| `spline_param` | Controls shock-surface smoothness. The default formula `1 - 1e-8 * 100^3 / Nchi^3` automatically adjusts with grid resolution. The coarse-grid stage in `main.m` overrides this with `1e-6` for stability. | Decrease (move away from 1) for smoother shock surfaces if point-to-point oscillations appear. |
+| `spline_smoothing` | Controls shock-surface smoothness, independently of the grid: the `csaps` parameter is set to `spline_param = 1 - spline_smoothing * (100/Nchi)^3` at every `INITIALIZATION`, so one fit filters the same number of cells on every grid. The default `1e-7` removes 2-3 cell noise and keeps features of 10+ cells. The coarse-grid stage in `main.m` uses `1e-6` for stability. | Increase (e.g. `1e-6`) for a smoother shock if point-to-point oscillations appear in the shock angle. Setting `spline_param` directly (without `spline_smoothing`) is still accepted, but it is not rescaled with the grid. |
 
 ### Time Integration
 

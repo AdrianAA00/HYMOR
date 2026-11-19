@@ -11,6 +11,8 @@ function s = LEAST_SQUARES_SHOCK_POINTS(s)
 %   Inputs:
 %       s (struct) - Solution structure containing at minimum:
 %                    .shock.spline_param   - Smoothing parameter for csaps, p in [0, 1]
+%                                            (set from shock.spline_smoothing for the
+%                                            current grid by VERIFY_INPUT_DATA)
 %                    .shock.points_chi     - (Nx x 1) parametric coordinates of shock points
 %                    .shock.points_x/y     - (Nx x 1) Cartesian shock coordinates
 %                    .mesh.chi             - (Nx x Ny) grid parametric coordinates

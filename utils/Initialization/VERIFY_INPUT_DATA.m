@@ -43,6 +43,11 @@ function s = VERIFY_INPUT_DATA(s)
 %         chemical_equilibrium = false, chemistry_composition = "None".
 %       - Periodic BCs require matching on opposite boundaries and grid
 %         dimensions divisible by 3.
+%       - Shock spline smoothing: shock.spline_param is set to
+%         1 - spline_smoothing * (100/Nchi)^3 for the current Nchi
+%         (spline_smoothing overrides any spline_param given). Without
+%         either field, spline_smoothing defaults to 1e-7; a spline_param
+%         given alone is used as is (not rescaled with the grid).
 %       - Supported boundary types: "circle", "lid_driven_cavity",
 %         "channel", "pipe", "MSL", "blunt_cone".
 %       - Supported BC names: 'inflow_subsonic', 'inflow_supersonic',
@@ -302,7 +307,22 @@ function s = VERIFY_INPUT_DATA(s)
         assert(ismember(s.shock.formulation, ["Lagrangian", "Eulerian"]), 'Invalid shock.formulation');
         assert(isfield(s.shock, 'fitting'), 'Missing field: shock.fitting');
         assert(ismember(s.shock.fitting, ["csaps"]), 'Invalid shock.fitting: only "csaps" is supported');
-        assert(isfield(s.shock, 'spline_param'), 'Missing field: shock.spline_param');
+        % Shock spline smoothing. One csaps fit damps a wave of lambda cells
+        % by 1/(1 + (1-p) * (2*pi/lambda)^4 / h^3) (h = chi spacing ~ 1/Nchi),
+        % so 1 - p ~ h^3 keeps the filter fixed in cells on every grid:
+        % spline_smoothing = 1 - p at Nchi = 100, and p is rescaled to the
+        % current grid at every INITIALIZATION (start, restart, refinement).
+        % The default 1e-7 is close to csaps' recommended p = 1/(1 + h^3/6)
+        % (spline_smoothing = 1.7e-7): it removes 2-3 cell noise and keeps
+        % waves of 10+ cells.
+        if ~isfield(s.shock, 'spline_smoothing') && ~isfield(s.shock, 'spline_param')
+            s.shock.spline_smoothing = 1e-7;
+        end
+        if isfield(s.shock, 'spline_smoothing')
+            assert(isnumeric(s.shock.spline_smoothing) && isscalar(s.shock.spline_smoothing) ...
+                && s.shock.spline_smoothing >= 0, 'shock.spline_smoothing must be a non-negative scalar');
+            s.shock.spline_param = 1 - s.shock.spline_smoothing * (100 / s.mesh.Nchi)^3;
+        end
         assert(isnumeric(s.shock.spline_param) && s.shock.spline_param >= 0 && s.shock.spline_param <= 1, 'shock.spline_param must be between 0 and 1');
     end
 

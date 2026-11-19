@@ -427,7 +427,7 @@ solution.shock.remesh_shock_distance = 1.3;
 solution.shock.relaxation           = 1.0;
 solution.shock.formulation          = "Lagrangian";
 solution.shock.fitting              = "csaps";
-solution.shock.spline_param         = 1 - 1e-6 * 100^3 / solution.mesh.Nchi^3;
+solution.shock.spline_smoothing     = 1e-6;
 ```
 
 | Parameter | Effect | Guidance |
@@ -440,7 +440,7 @@ solution.shock.spline_param         = 1 - 1e-6 * 100^3 / solution.mesh.Nchi^3;
 | `relaxation` | Under-relaxation for shock speed. `1.0` = full physical speed, `< 1` = damped. | Reduce below 1 if the shock oscillates or the solver diverges. |
 | `formulation` | Shock reference frame. `"Lagrangian"` = mesh moves with the shock. `"Eulerian"` = fixed mesh. | `"Lagrangian"` is more robust for shock-fitted methods. |
 | `fitting` | Spline method for the shock surface. `"csaps"` = cubic smoothing spline. | `"csaps"` gives a smooth result whose derivatives are analytically available. |
-| `spline_param` | Smoothing parameter for `csaps` (between 0 and 1). Values close to 1 follow the data closely; lower values smooth more. | The default formula scales with `Nchi`. Decrease for smoother shock surfaces if oscillations appear. |
+| `spline_smoothing` | Grid-independent shock smoothing: the `csaps` parameter is set to `spline_param = 1 - spline_smoothing * (100/Nchi)^3` at every `INITIALIZATION`, so one fit filters the same number of cells on every grid. Larger values smooth more; the default is `1e-7`. | Increase for a smoother shock surface if oscillations appear in the shock angle. Setting `spline_param` directly (without `spline_smoothing`) is still accepted, but it is not rescaled with the grid. |
 
 ### Time Integration
 
