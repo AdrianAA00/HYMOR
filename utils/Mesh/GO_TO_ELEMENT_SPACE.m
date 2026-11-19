@@ -118,6 +118,11 @@ function [chi, eta] = GO_TO_ELEMENT_SPACE(x, y, s)
 
             eta = eta_phys ./ distance_max;
 
+        %% Pipe (inverse of the wall refinement)
+        case "pipe"
+            chi = x / s.curvilinear_mapping.Lx;
+            eta = 1 - (1 - y / s.curvilinear_mapping.R).^(1 / s.curvilinear_mapping.eta_refinement_power);
+
         %% Channel (inverse with channel angle)
         case "channel"
             chi = (x .* cos(s.curvilinear_mapping.channel_angle) + y .* sin(s.curvilinear_mapping.channel_angle)) / s.curvilinear_mapping.Lx;

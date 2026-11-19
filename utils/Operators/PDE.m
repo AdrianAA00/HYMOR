@@ -23,7 +23,11 @@ function s = PDE(s, chemistry)
 %       - In linearized mode, chemistry equilibrium is not recomputed.
 %       - The 2D branch calls FLUX_MASS, FLUX_MOMENTUM, FLUX_TOTAL_ENERGY,
 %         and VISCOUS_FLUX.
-%       - The 3D-axisymmetric branch calls the _3D variants of each.
+%       - The 3D-axisymmetric branch calls the _3D variants of the inviscid
+%         fluxes; VISCOUS_FLUX handles both dimensions.
+%       - In linearized mode with an azimuthal mode set up (s.azimuthal),
+%         APPLY_BOUNDARY_CONDITIONS_AZIMUTHAL and FLUX_AZIMUTHAL_MODE add
+%         the ghost cells and terms of the azimuthal wavenumber.
 %
 % Part of: Hypersonics Stability MATLAB Solver - Operators Module
 
@@ -39,6 +43,10 @@ function s = PDE(s, chemistry)
 
     %% Apply remaining boundary conditions
     s = APPLY_BOUNDARY_CONDITIONS(s, chemistry);
+    azimuthal_mode = s.linearize && isfield(s, 'azimuthal');
+    if azimuthal_mode
+        s = APPLY_BOUNDARY_CONDITIONS_AZIMUTHAL(s);
+    end
 
     %% Compute inviscid and viscous fluxes
     if s.PDE_dimension == "2D"
@@ -52,6 +60,9 @@ function s = PDE(s, chemistry)
         s = FLUX_MASS_3D(s);
         s = FLUX_MOMENTUM_3D(s);
         s = FLUX_TOTAL_ENERGY_3D(s);
-        s = VISCOUS_FLUX_3D(s);
+        s = VISCOUS_FLUX(s);
+        if azimuthal_mode
+            s = FLUX_AZIMUTHAL_MODE(s);
+        end
     end
 end

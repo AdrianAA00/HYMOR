@@ -226,6 +226,7 @@ function L = NEWTON_JACOBIAN(s, chemistry, jac_every, reset)
             s_lin.stability_analysis = struct();
         end
         s_lin.stability_analysis.perturb_shock = false;  % flow-flow (A11) block only
+        s_lin = CLEAR_AZIMUTHAL_MODE(s_lin);              % axisymmetric (4-variable) Jacobian
         if ~isfield(s_lin.stability_analysis, 'perturbation_magnitude')
             s_lin.stability_analysis.perturbation_magnitude = 1e-6;
         end

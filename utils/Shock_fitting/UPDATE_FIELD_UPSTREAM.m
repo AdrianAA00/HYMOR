@@ -45,20 +45,15 @@ function s = UPDATE_FIELD_UPSTREAM(s)
     upstream_mask = col_grid > cutoff_cols;
 
     if isfield(s, 'rho_0_upstream_p')
-        %% Prescribed perturbed upstream state
-        
-        % Expand the 1D prescribed vectors to full 2D grids (row-dependent)
-        rho_p_full  = zeros(Nx, Ny); rho_p_full(2:s.mesh.Nchi+1, :)  = repmat(s.freestream.rho_0_p, 1, Ny);
-        rhou_p_full = zeros(Nx, Ny); rhou_p_full(2:s.mesh.Nchi+1, :) = repmat(s.freestream.rho_u_0_p, 1, Ny);
-        rhov_p_full = zeros(Nx, Ny); rhov_p_full(2:s.mesh.Nchi+1, :) = repmat(s.freestream.rho_v_0_p, 1, Ny);
-        rhoE_p_full = zeros(Nx, Ny); rhoE_p_full(2:s.mesh.Nchi+1, :) = repmat(s.freestream.rho_E_0_p, 1, Ny);
-        
-        % Apply values using the logical mask (Blazing fast in MATLAB)
-        s.var.rho(upstream_mask)   = rho_p_full(upstream_mask);
-        s.var.rho_u(upstream_mask) = rhou_p_full(upstream_mask);
-        s.var.rho_v(upstream_mask) = rhov_p_full(upstream_mask);
-        s.var.rho_E(upstream_mask) = rhoE_p_full(upstream_mask);
-        
+        %% Prescribed perturbed upstream state (PRESCRIBE_UPSTREAM_STATE)
+        % Expand the per-shock-point values along each row and apply them
+        % with the logical mask
+        for f = PERTURBATION_FIELDS(s)
+            field_full = zeros(Nx, Ny);
+            field_full(2:s.mesh.Nchi+1, :) = repmat(s.freestream.(f + "_0_p"), 1, Ny);
+            s.var.(f)(upstream_mask) = field_full(upstream_mask);
+        end
+
         if ~s.chemistry.chemical_equilibrium
             s.var.gamma_star(upstream_mask) = s.freestream.gamma_star;
             s.var.cv_star(upstream_mask)    = 1;
@@ -80,6 +75,9 @@ function s = UPDATE_FIELD_UPSTREAM(s)
         s.var.rho_u(upstream_mask) = s.freestream.rho_u_0 + perturbation_up * s.freestream.disturbance.amplitude(2);
         s.var.rho_v(upstream_mask) = s.freestream.rho_v_0 + perturbation_up * s.freestream.disturbance.amplitude(3);
         s.var.rho_E(upstream_mask) = s.freestream.rho_E_0 + perturbation_up * s.freestream.disturbance.amplitude(4);
+        if isfield(s, 'azimuthal')
+            s.var.rho_w(upstream_mask) = 0;   % no swirl in the freestream
+        end
         
         if ~s.chemistry.chemical_equilibrium
             s.var.gamma_star(upstream_mask) = s.freestream.gamma_star;

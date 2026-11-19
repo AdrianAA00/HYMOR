@@ -34,6 +34,8 @@ function s = CFL_TIMESTEP(s)
 %       - Convective and viscous contributions are summed per cell before
 %         taking the global minimum dt (the proper combined explicit-CFL
 %         constraint), rather than min(dt_conv, dt_visc).
+%       - For an azimuthal mode m > 0 (s.azimuthal, linear analyses) the
+%         per-cell rate gains m*c/r + 2*nu_eff*(m/r)^2.
 %       - For shock-fitted simulations (s.shock.enabled == true) the limits
 %         are masked by s.shock.flow_cells so that only active flow cells
 %         contribute.
@@ -77,6 +79,12 @@ function s = CFL_TIMESTEP(s)
 
     %% Combined convective + viscous time step (per-cell sum, global min)
     lam_over_V = (lam_c + lam_v) .* s.shock.flow_cells ./ s.mesh.volume;
+
+    % Azimuthal mode m: acoustic rate m a / r and viscous rate 2 nu (m / r)^2
+    if isfield(s, 'azimuthal') && s.azimuthal.m > 0
+        m_r = s.azimuthal.m ./ s.mesh.y;
+        lam_over_V = lam_over_V + (c * m_r + 2 * nu_eff .* m_r.^2) .* s.shock.flow_cells;
+    end
     dt1 = s.time_integration.CFL / max(lam_over_V, [], "all");
 
     %% Flux-magnitude time step

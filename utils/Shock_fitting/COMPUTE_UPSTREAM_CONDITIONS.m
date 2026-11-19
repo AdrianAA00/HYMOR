@@ -66,7 +66,8 @@ function [rho, rho_u, rho_v, rho_E] = UPDATE_SHOCK_UPSTREAM(s)
     end
 
     %% Apply symmetry boundary conditions for axisymmetric flows
-    if s.PDE_dimension == "3D-axisymmetric"
+    % (odd azimuthal modes have a non-zero radial velocity on the axis)
+    if s.PDE_dimension == "3D-axisymmetric" && ~(isfield(s, 'azimuthal') && s.azimuthal.odd)
         rho_v(1, 1) = 0;
     end
 end

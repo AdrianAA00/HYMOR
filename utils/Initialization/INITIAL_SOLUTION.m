@@ -12,7 +12,7 @@ function s = INITIAL_SOLUTION(s, chemistry)
 %   Inputs:
 %       s  - (struct) Solver data structure. Must contain at minimum:
 %           .curvilinear_mapping.boundary_type  - (string) Geometry type:
-%                                                 'channel', 'MSL', 'blunt_cone',
+%                                                 'channel', 'pipe', 'MSL', 'blunt_cone',
 %                                                 'circle', 'lid_driven_cavity'
 %           .var.rho_E                  - (matrix) Total energy field (for sizing)
 %           .freestream.rho_u_0         - (scalar) Non-dim upstream x-momentum
@@ -24,8 +24,9 @@ function s = INITIAL_SOLUTION(s, chemistry)
 %           .freestream.cv              - (scalar) Freestream cv for normalization
 %           .chemistry.is_chemistry_enabled  - (logical) Chemistry toggle
 %           .chemistry.chemical_equilibrium  - (logical) Equilibrium model flag
-%           .mesh.y_Ext                 - (matrix) Extended y-coordinates (channel)
+%           .mesh.y_Ext                 - (matrix) Extended y-coordinates (channel, pipe)
 %           .curvilinear_mapping.Ly     - (scalar) Channel height (channel case)
+%           .curvilinear_mapping.R      - (scalar) Pipe radius (pipe case)
 %       chemistry - (struct) Chemistry model with evaluation functions:
 %                     .frozen.eval_gamma_star - effective gamma evaluator
 %                     .frozen.eval_cv_star    - effective cv evaluator
@@ -35,8 +36,9 @@ function s = INITIAL_SOLUTION(s, chemistry)
 %                   flow field and chemistry properties.
 %
 %   Notes:
-%       - All supported boundary types receive the same uniform
-%         initialization; the branching exists for future extensibility.
+%       - External-flow geometries receive the uniform freestream; the
+%         channel and the pipe start from the parabolic (Poiseuille and
+%         Hagen-Poiseuille) profiles with uniform density and pressure.
 %       - The multiplication by zero (rho_E*0) is used to create an array
 %         of the correct size filled with the upstream value.
 %
@@ -58,11 +60,16 @@ function s = INITIAL_SOLUTION(s, chemistry)
         s.var.rho_v = zeros(field_size) + s.freestream.rho_v_0;
         s.var.rho   = zeros(field_size) + s.freestream.rho_0;
         s.var.rho_E = zeros(field_size) + s.freestream.rho_E_0;
-    elseif strcmp(s.curvilinear_mapping.boundary_type, 'channel')
-        % Parabolic velocity profile: u(y) = u_max * y*(2-y)
-        %   zero at y = 0 and y = 2, maximum at y = 1
-        y = 2 * s.mesh.y_Ext ./ s.curvilinear_mapping.Ly;  % Normalize to [0,2] for the profile
-        u_profile = y .* (2 - y);  % ranges from 0 to 1
+    elseif any(strcmp(s.curvilinear_mapping.boundary_type, {'channel', 'pipe'}))
+        if strcmp(s.curvilinear_mapping.boundary_type, 'channel')
+            % Parabolic velocity profile: u(y) = u_max * y*(2-y)
+            %   zero at y = 0 and y = 2, maximum at y = 1
+            y = 2 * s.mesh.y_Ext ./ s.curvilinear_mapping.Ly;  % Normalize to [0,2] for the profile
+            u_profile = y .* (2 - y);  % ranges from 0 to 1
+        else
+            % Hagen-Poiseuille profile u = U (1 - (r/R)^2), r = y
+            u_profile = 1 - (s.mesh.y_Ext ./ s.curvilinear_mapping.R).^2;
+        end
 
         s.var.rho   = zeros(field_size) + s.freestream.rho_0;
         s.var.rho_v = zeros(field_size);  % v = 0

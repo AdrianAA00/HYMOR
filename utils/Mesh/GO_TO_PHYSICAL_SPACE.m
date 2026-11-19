@@ -24,6 +24,9 @@ function [x, y] = GO_TO_PHYSICAL_SPACE(chi, eta, s)
 %         eta maps to wall-normal distance via a piecewise geometry.
 %       - For "channel", "lid_driven_cavity", "wedge", chi maps to
 %         streamwise length and eta maps to wall-normal distance.
+%       - For "pipe" (3D-axisymmetric), chi maps to the axial length Lx and
+%         eta to the radius y in [0, R] (eta = 0 on the axis), refined
+%         towards the pipe wall by eta_refinement_power.
 %
 % Part of: Hypersonics Stability MATLAB Solver - Mesh Module
 
@@ -116,6 +119,12 @@ function [x, y] = GO_TO_PHYSICAL_SPACE(chi, eta, s)
                 x(i,:) = -y_body;
                 y(i,:) =  x_body;
             end
+
+        %% Pipe of radius R (axis at y = 0, wall at y = R)
+        case "pipe"
+            p = s.curvilinear_mapping.eta_refinement_power;
+            x = chi * s.curvilinear_mapping.Lx;
+            y = (1 - (1 - eta).^p) * s.curvilinear_mapping.R;
 
         %% Channel (with optional channel angle)
         case "channel"

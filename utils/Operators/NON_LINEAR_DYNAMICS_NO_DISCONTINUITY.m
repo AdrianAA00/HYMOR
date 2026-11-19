@@ -17,6 +17,7 @@ function [s] = NON_LINEAR_DYNAMICS_NO_DISCONTINUITY(s, chemistry)
 %                   .flux.rho_u     - x-momentum flux field
 %                   .flux.rho_v     - y-momentum flux field
 %                   .flux.rho_E     - Total energy flux field
+%                   .flux.rho_w     - Azimuthal momentum flux (azimuthal modes)
 %       chemistry - Chemistry model struct passed to PDE
 %
 %   Outputs:
@@ -35,10 +36,9 @@ function [s] = NON_LINEAR_DYNAMICS_NO_DISCONTINUITY(s, chemistry)
 
     %% Apply shock-feedback mask if active
     if s.shock.enabled == true && s.shock.feedback
-        s.flux.rho   = s.flux.rho   .* s.shock.flow_cells;
-        s.flux.rho_u = s.flux.rho_u .* s.shock.flow_cells;
-        s.flux.rho_v = s.flux.rho_v .* s.shock.flow_cells;
-        s.flux.rho_E = s.flux.rho_E .* s.shock.flow_cells;
+        for f = PERTURBATION_FIELDS(s)
+            s.flux.(f) = s.flux.(f) .* s.shock.flow_cells;
+        end
     end
 
 end

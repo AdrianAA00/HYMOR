@@ -56,6 +56,7 @@ function PLOT_MODES(freestream_disturbances, A, s, chemistry, V, T_plot, w_infty
     end
 
     N_v = s.mesh.Nchi * s.mesh.Neta;
+    nv = numel(PERTURBATION_FIELDS(s));   % 5 for an azimuthal mode (rho_w after rho_E)
     if freestream_disturbances
         N_f = length(w_infty);
     else
@@ -67,16 +68,20 @@ function PLOT_MODES(freestream_disturbances, A, s, chemistry, V, T_plot, w_infty
     pert_rho_u = real(reshape(V((1)*N_v+1:2*N_v, 1), s.mesh.Nchi, s.mesh.Neta));
     pert_rho_v = real(reshape(V((2)*N_v+1:3*N_v, 1), s.mesh.Nchi, s.mesh.Neta));
     pert_rho_E = real(reshape(V((3)*N_v+1:4*N_v, 1), s.mesh.Nchi, s.mesh.Neta));
+    if nv == 5
+        pert_w = real(reshape(V(4*N_v+1:5*N_v, 1), s.mesh.Nchi, s.mesh.Neta)) ./ s.var.rho(2:end-1, 2:end-1);
+        scale_w = max(abs(pert_w), [], 'all');
+    end
 
     %% Extract freestream disturbance amplitudes (if present)
-    size_freestream_problem_1 = 4 * s.mesh.Nchi * s.mesh.Neta + 4 * s.mesh.Nchi * N_f + s.mesh.Nchi;
-    size_freestream_problem_2 = 4 * s.mesh.Nchi * s.mesh.Neta + 4 * s.mesh.Nchi * N_f;
+    size_freestream_problem_1 = nv * N_v + nv * s.mesh.Nchi * N_f + s.mesh.Nchi;
+    size_freestream_problem_2 = nv * N_v + nv * s.mesh.Nchi * N_f;
 
     if size(V, 1) == size_freestream_problem_1
-        idx_start_infty = 4 * s.mesh.Nchi * s.mesh.Neta + s.mesh.Nchi;
+        idx_start_infty = nv * N_v + s.mesh.Nchi;
         pert_infty_all = V(idx_start_infty+1:size_freestream_problem_1, 1);
     elseif size(V, 1) == size_freestream_problem_2
-        idx_start_infty = 4 * s.mesh.Nchi * s.mesh.Neta;
+        idx_start_infty = nv * N_v;
         pert_infty_all = V(idx_start_infty+1:size_freestream_problem_2, 1);
     end
 
@@ -85,7 +90,7 @@ function PLOT_MODES(freestream_disturbances, A, s, chemistry, V, T_plot, w_infty
         solution_remesh = false;
         [pert_rho, pert_rho_u, pert_rho_v, pert_rho_E] = ADD_FREESTREAM_DISTURBANCES( ...
             pert_rho, pert_rho_u, pert_rho_v, pert_rho_E, ...
-            pert_infty_all, s, w_infty, T_plot, solution_remesh);
+            pert_infty_all, s, w_infty, T_plot, solution_remesh, nv);
         [scale_u, scale_vort, scale_div, scale_rho, scale_p, scale_s] = SCALINGS( ...
             s, pert_rho, pert_rho_u, pert_rho_v, pert_rho_E);
         [~, dE_dt_V_inflow] = ENERGY_INFLOW(V, s, w_infty);
@@ -104,7 +109,7 @@ function PLOT_MODES(freestream_disturbances, A, s, chemistry, V, T_plot, w_infty
         solution_remesh = true;
         [pert_rho, pert_rho_u, pert_rho_v, pert_rho_E] = ADD_FREESTREAM_DISTURBANCES( ...
             pert_rho, pert_rho_u, pert_rho_v, pert_rho_E, ...
-            pert_infty_all, s, w_infty, 0, solution_remesh);
+            pert_infty_all, s, w_infty, 0, solution_remesh, nv);
         [scale_u, scale_vort, scale_div, scale_rho, scale_p, scale_s] = SCALINGS( ...
             s, pert_rho, pert_rho_u, pert_rho_v, pert_rho_E);
 
@@ -161,12 +166,15 @@ function PLOT_MODES(freestream_disturbances, A, s, chemistry, V, T_plot, w_infty
         pert_rho_u = real(reshape(V((1)*N_v+1:2*N_v, 1), s.mesh.Nchi, s.mesh.Neta));
         pert_rho_v = real(reshape(V((2)*N_v+1:3*N_v, 1), s.mesh.Nchi, s.mesh.Neta));
         pert_rho_E = real(reshape(V((3)*N_v+1:4*N_v, 1), s.mesh.Nchi, s.mesh.Neta));
+        if nv == 5
+            pert_w = real(reshape(V(4*N_v+1:5*N_v, 1), s.mesh.Nchi, s.mesh.Neta)) ./ s.var.rho(2:end-1, 2:end-1);
+        end
 
         solution_remesh = false;
         if freestream_disturbances
             [pert_rho, pert_rho_u, pert_rho_v, pert_rho_E] = ADD_FREESTREAM_DISTURBANCES( ...
                 pert_rho, pert_rho_u, pert_rho_v, pert_rho_E, ...
-                pert_infty_all, s, w_infty, T_plot, solution_remesh);
+                pert_infty_all, s, w_infty, T_plot, solution_remesh, nv);
         end
     end
 
@@ -208,7 +216,7 @@ function PLOT_MODES(freestream_disturbances, A, s, chemistry, V, T_plot, w_infty
     if s.shock.enabled == true
         solution2 = s;
         if s.stability_analysis.perturb_shock
-            dr_shock = real(V((4)*N_v+1:4*N_v+s.mesh.Nchi, 1));
+            dr_shock = real(V(nv*N_v+1:nv*N_v+s.mesh.Nchi, 1));
             ang = s.shock.beta;
             solution2.shock.points_x = s.shock.points_x ...
                 - dr_shock .* sin(ang) / s.stability_analysis.perturbation_magnitude / 2000000;
@@ -267,6 +275,9 @@ function PLOT_MODES(freestream_disturbances, A, s, chemistry, V, T_plot, w_infty
         %{pert_div / scale_div,       '$\displaystyle \frac{\nabla \cdot \vec{u}^\prime(t)}{max(|\nabla \cdot \vec{u}^\prime(0)|)}$',       'mode_divergence'}
         {pert_entropy / scale_s,     '$\displaystyle \frac{s^\prime(t)}{max(|s^\prime(0)|)}$',       'mode_entropy'}
     };
+    if nv == 5
+        pert_plots(end+1) = {{pert_w / scale_w, '$\displaystyle \frac{w^\prime(t)}{max(|w^\prime(0)|)}$', 'mode_azimuthal_velocity'}};
+    end
 
     %% Build coordinate arrays and create all plots
     fprintf('Creating perturbation plots...\n');
@@ -564,7 +575,7 @@ end
 %  ========================================================================
 function [pert_rho, pert_rho_u, pert_rho_v, pert_rho_E] = ADD_FREESTREAM_DISTURBANCES( ...
         pert_rho, pert_rho_u, pert_rho_v, pert_rho_E, ...
-        pert_infty_all, s, w_infty, T_plot, solution_remesh)
+        pert_infty_all, s, w_infty, T_plot, solution_remesh, nv)
 % ADD_FREESTREAM_DISTURBANCES  Superpose freestream Fourier modes onto the
 %   interior perturbation fields beyond the shock.
 %
@@ -576,6 +587,7 @@ function [pert_rho, pert_rho_u, pert_rho_v, pert_rho_E] = ADD_FREESTREAM_DISTURB
 %       w_infty                - (vector) freestream frequencies.
 %       T_plot                 - (scalar) evaluation time.
 %       solution_remesh        - (logical) if true, zero interior first.
+%       nv                     - (scalar) variables per freestream point.
 %
 %   Outputs:
 %       pert_rho, pert_rho_u,
@@ -594,10 +606,10 @@ function [pert_rho, pert_rho_u, pert_rho_v, pert_rho_E] = ADD_FREESTREAM_DISTURB
     rho_E_infty_all = zeros(size_infty, 1);
 
     for i = 0:N_f-1
-        rho_infty_all(  i*Nx+1:i*Nx+Nx, 1) = pert_infty_all(4*i*Nx+1      : 4*i*Nx+Nx,   1);
-        rho_u_infty_all(i*Nx+1:i*Nx+Nx, 1) = pert_infty_all(4*i*Nx+Nx+1   : 4*i*Nx+2*Nx, 1);
-        rho_v_infty_all(i*Nx+1:i*Nx+Nx, 1) = pert_infty_all(4*i*Nx+2*Nx+1 : 4*i*Nx+3*Nx, 1);
-        rho_E_infty_all(i*Nx+1:i*Nx+Nx, 1) = pert_infty_all(4*i*Nx+3*Nx+1 : 4*i*Nx+4*Nx, 1);
+        rho_infty_all(  i*Nx+1:i*Nx+Nx, 1) = pert_infty_all(nv*i*Nx+1      : nv*i*Nx+Nx,   1);
+        rho_u_infty_all(i*Nx+1:i*Nx+Nx, 1) = pert_infty_all(nv*i*Nx+Nx+1   : nv*i*Nx+2*Nx, 1);
+        rho_v_infty_all(i*Nx+1:i*Nx+Nx, 1) = pert_infty_all(nv*i*Nx+2*Nx+1 : nv*i*Nx+3*Nx, 1);
+        rho_E_infty_all(i*Nx+1:i*Nx+Nx, 1) = pert_infty_all(nv*i*Nx+3*Nx+1 : nv*i*Nx+4*Nx, 1);
     end
 
     %% Zero freestream region and superpose Fourier modes

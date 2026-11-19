@@ -61,7 +61,7 @@ function [V, D, T_opt] = FREESTREAM_RECEPTIVITY(A_, s, n_modes, T, w_infty)
 
     %% Detect GPU availability
     use_gpu = (gpuDeviceCount > 0);
-    N_set_0 = 4 * s.mesh.Nchi * s.mesh.Neta;
+    N_set_0 = numel(PERTURBATION_FIELDS(s)) * s.mesh.Nchi * s.mesh.Neta;
     n = size(A_, 1);
 
     if use_gpu
