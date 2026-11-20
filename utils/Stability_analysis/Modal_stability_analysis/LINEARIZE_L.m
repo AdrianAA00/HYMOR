@@ -25,6 +25,9 @@ function [s, L] = LINEARIZE_L(s, chemistry)
 %         L is the operator of the azimuthal mode m; the returned s keeps
 %         the set-up (s.azimuthal, SETUP_AZIMUTHAL_MODE) that the norms,
 %         transient-growth and receptivity routines read.
+%       - With s.stability_analysis.outflow_damping.enabled, a damping layer
+%         (OUTFLOW_DAMPING) is subtracted from L next to outflow-type
+%         boundaries; it acts on perturbations only (base flow unchanged).
 %       - The mesh is verified to follow the shock before linearization via
 %         CHECK_MESH_FOLLOWS_SHOCK.
 %       - Chemistry equilibrium state is updated before constructing L.
@@ -67,6 +70,13 @@ function [s, L] = LINEARIZE_L(s, chemistry)
 
     %% Validate linearization
     CHECK_LINEARIZATION_L(L, s, chemistry);
+
+    %% Damping layer at outflow boundaries (acts on perturbations only)
+    if isfield(s.stability_analysis, 'outflow_damping') && s.stability_analysis.outflow_damping.enabled
+        [D_damp, sigma] = OUTFLOW_DAMPING(s);
+        L = L - D_damp;
+        fprintf("Outflow damping layer: %d cells damped, max rate %.3g\n", nnz(sigma), max(sigma(:)));
+    end
 
     s.linearize = false;
 end

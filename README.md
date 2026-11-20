@@ -227,7 +227,7 @@ All simulation parameters are defined in the input file (`input_file.m` for MATL
 - **Thermochemistry**: `solution.chemistry` (model type, atmospheric composition)
 - **Shock fitting**: `solution.shock` (enable/disable, spline method, relaxation)
 - **Time integration**: `solution.time_integration` (scheme, CFL, number of iterations)
-- **Stability analysis**: `solution.stability_analysis` (eigensolver, perturbation magnitude, azimuthal wavenumber)
+- **Stability analysis**: `solution.stability_analysis` (eigensolver, perturbation magnitude, azimuthal wavenumber, `outflow_damping`: damping layer of the linear operator next to outflow boundaries, on by default)
 
 ## References
 

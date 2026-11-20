@@ -48,6 +48,9 @@ function s = VERIFY_INPUT_DATA(s)
 %         (spline_smoothing overrides any spline_param given). Without
 %         either field, spline_smoothing defaults to 1e-7; a spline_param
 %         given alone is used as is (not rescaled with the grid).
+%       - stability_analysis.outflow_damping (enabled, fraction, strength)
+%         defaults to true, 0.05, 10: damping layer of the linear operator
+%         next to outflow boundaries (OUTFLOW_DAMPING).
 %       - Supported boundary types: "circle", "lid_driven_cavity",
 %         "channel", "pipe", "MSL", "blunt_cone".
 %       - Supported BC names: 'inflow_subsonic', 'inflow_supersonic',
@@ -340,6 +343,21 @@ function s = VERIFY_INPUT_DATA(s)
     else
         assert(islogical(s.stability_analysis.perturb_shock), 'stability_analysis.perturb_shock must be a logical');
     end
+    % Damping layer of the linear operator at outflow boundaries (OUTFLOW_DAMPING)
+    damping_defaults = struct('enabled', true, 'fraction', 0.05, 'strength', 10);
+    if ~isfield(s.stability_analysis, 'outflow_damping')
+        s.stability_analysis.outflow_damping = damping_defaults;
+    end
+    for f = string(fieldnames(damping_defaults))'
+        if ~isfield(s.stability_analysis.outflow_damping, f)
+            s.stability_analysis.outflow_damping.(f) = damping_defaults.(f);
+        end
+    end
+    assert(islogical(s.stability_analysis.outflow_damping.enabled), 'stability_analysis.outflow_damping.enabled must be a logical');
+    assert(isnumeric(s.stability_analysis.outflow_damping.fraction) && s.stability_analysis.outflow_damping.fraction > 0 ...
+        && s.stability_analysis.outflow_damping.fraction < 0.5, 'stability_analysis.outflow_damping.fraction must be in (0, 0.5)');
+    assert(isnumeric(s.stability_analysis.outflow_damping.strength) && s.stability_analysis.outflow_damping.strength >= 0, ...
+        'stability_analysis.outflow_damping.strength must be non-negative');
 
     % 12. Running Plot
     assert(isfield(s, 'running_plot'), 'Missing field: running_plot');

@@ -20,6 +20,9 @@
 #         chemical_equilibrium = false, chemistry_composition = "None".
 #       - Periodic BCs require matching on opposite boundaries and grid
 #         dimensions divisible by 3.
+#       - stability_analysis.outflow_damping (enabled, fraction, strength)
+#         defaults to enabled, 0.05, 10: damping layer of the linear operator
+#         next to outflow boundaries (OUTFLOW_DAMPING).
 #       - Shock spline smoothing: shock.spline_param is set to
 #         1 - spline_smoothing * (100/Nchi)^3 for the current Nchi
 #         (spline_smoothing overrides any spline_param given). Without
@@ -377,6 +380,21 @@ function VERIFY_INPUT_DATA(s::Dict{String,Any})
     else
         @assert isa(s["stability_analysis"]["perturb_shock"], Bool) "stability_analysis.perturb_shock must be a Bool"
     end
+    # Damping layer of the linear operator at outflow boundaries (OUTFLOW_DAMPING)
+    damping_defaults = Dict{String,Any}("enabled" => true, "fraction" => 0.05, "strength" => 10.0)
+    if !haskey(s["stability_analysis"], "outflow_damping")
+        s["stability_analysis"]["outflow_damping"] = Dict{String,Any}()
+    end
+    for (key, value) in damping_defaults
+        if !haskey(s["stability_analysis"]["outflow_damping"], key)
+            s["stability_analysis"]["outflow_damping"][key] = value
+        end
+    end
+    @assert isa(s["stability_analysis"]["outflow_damping"]["enabled"], Bool) "stability_analysis.outflow_damping.enabled must be a Bool"
+    @assert isa(s["stability_analysis"]["outflow_damping"]["fraction"], Number) && 0 < s["stability_analysis"]["outflow_damping"]["fraction"] < 0.5 "stability_analysis.outflow_damping.fraction must be in (0, 0.5)"
+    @assert isa(s["stability_analysis"]["outflow_damping"]["strength"], Number) && s["stability_analysis"]["outflow_damping"]["strength"] >= 0 "stability_analysis.outflow_damping.strength must be non-negative"
+    s["stability_analysis"]["outflow_damping"]["fraction"] = Float64(s["stability_analysis"]["outflow_damping"]["fraction"])
+    s["stability_analysis"]["outflow_damping"]["strength"] = Float64(s["stability_analysis"]["outflow_damping"]["strength"])
 
     # 12. Running Plot
     @assert haskey(s, "running_plot") "Missing field: running_plot"

@@ -100,7 +100,7 @@ export ppval
 # Stability analysis – eigenvalues
 export ARNOLDI_POWER_GPU, EIGENVALUES
 # Stability analysis – modal
-export LINEARIZE_EQUATIONS_NO_DISCONTINUITY, CHECK_LINEARIZATION_L, LINEARIZE_L
+export LINEARIZE_EQUATIONS_NO_DISCONTINUITY, CHECK_LINEARIZATION_L, LINEARIZE_L, OUTFLOW_DAMPING
 # Stability analysis – transient growth downstream
 export CONSTRUCT_M, CONSTRUCT_M_HAT, CONSTRUCT_C, CONSTRUCT_R
 export TRANSIENT_GROWTH_DOWNSTREAM
@@ -229,6 +229,7 @@ include("../utils/Stability_analysis/Eigenvalues/EIGENVALUES.jl")
 # Modal stability analysis
 include("../utils/Stability_analysis/Modal_stability_analysis/LINEARIZE_EQUATIONS_NO_DISCONTINUITY.jl")
 include("../utils/Stability_analysis/Modal_stability_analysis/CHECK_LINEARIZATION_L.jl")
+include("../utils/Stability_analysis/Modal_stability_analysis/OUTFLOW_DAMPING.jl")
 include("../utils/Stability_analysis/Modal_stability_analysis/LINEARIZE_L.jl")
 
 # Transient growth downstream

@@ -119,6 +119,7 @@ solution["shock"]["initial_beta"]             = 55 * pi / 180 # Initial guess fo
 solution["stability_analysis"] = Dict{String, Any}()
 solution["stability_analysis"]["perturbation_magnitude"]  = 1e-8                    # Linearization perturbation size
 solution["stability_analysis"]["eigenvalue_solver"]       = "GPU_TIMESTEPPER_ARNOLDI" # Eigensolver: "CPU_LU", "GPU_TIMESTEPPER_ARNOLDI"
+solution["stability_analysis"]["outflow_damping"]         = Dict{String, Any}("enabled" => true, "fraction" => 0.05, "strength" => 10.0) # Damping layer of the linear operator at outflow boundaries: width (fraction of cells), rate at the boundary; also damps frozen cells beyond the shock
 
 ## Live plots during time-marching
 solution["running_plot"] = Dict{String, Any}()

@@ -23,6 +23,9 @@ CHECK_LINEARIZATION_L.
   nor transient growth analysis is requested.
 
 # Notes
+- With s["stability_analysis"]["outflow_damping"]["enabled"], a damping layer
+  (OUTFLOW_DAMPING) is subtracted from L next to outflow-type boundaries; it
+  acts on perturbations only (base flow unchanged).
 - The mesh is verified to follow the shock before linearization via
   CHECK_MESH_FOLLOWS_SHOCK.
 - Chemistry equilibrium state is updated before constructing L.
@@ -63,6 +66,13 @@ function LINEARIZE_L(s::Dict{String,Any}, chemistry::Dict{String,Any})
 
     ## Validate linearization
     CHECK_LINEARIZATION_L(L, s, chemistry)
+
+    ## Damping layer at outflow boundaries (acts on perturbations only)
+    if haskey(s["stability_analysis"], "outflow_damping") && s["stability_analysis"]["outflow_damping"]["enabled"]
+        (D_damp, sigma) = OUTFLOW_DAMPING(s)
+        L = L - D_damp
+        @printf("Outflow damping layer: %d cells damped, max rate %.3g\n", count(!iszero, sigma), maximum(sigma))
+    end
 
     s["linearize"] = false
     return (s, L)
