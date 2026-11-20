@@ -1,5 +1,3 @@
-using NaturalNeighbours
-
 # RESTART_SOLUTION  Restart a solution from a previously saved state.
 #   Handles re-meshing with field interpolation when the grid dimensions
 #   have changed, or directly restores the old solution when no re-mesh
@@ -19,9 +17,13 @@ using NaturalNeighbours
 #   Notes:
 #       - If Nchi or Neta differ between old and new solutions, remeshing is
 #         triggered and all conserved fields are interpolated onto the new
-#         grid using linear interpolation.
-#       - When a shock is present, only data from inner (sub-shock) cells
-#         is used for interpolation to avoid smearing the discontinuity.
+#         grid (REMESH_INTERPOLATION: cubic interpolation along the old grid
+#         lines, smooth on stretched and curved meshes).
+#       - When a shock is present, only post-shock data is used for
+#         interpolation to avoid smearing the discontinuity.
+#       - A remesh moves the shock relative to the cells (it is re-centred
+#         in its row). The interpolated state is not a steady state of the
+#         new mesh: march further before linearizing about it.
 #       - After interpolation, boundary conditions, chemistry, and
 #         thermodynamic properties are recomputed on the new mesh.
 #       - If no remeshing is needed, the old solution is copied directly.
@@ -73,95 +75,8 @@ function RESTART_SOLUTION(s::Dict{String,Any}, solution_old::Dict{String,Any},
         s["time_integration"]["t"] = solution_old["time_integration"]["t"]
         s = GENERATE_MESH(s, disturbances)
 
-        ## Interpolate fields without shock (full-domain Delaunay linear interpolation)
-        if !s["shock"]["enabled"]
-            x_old = vec(solution_old["mesh"]["x_Ext"])
-            y_old = vec(solution_old["mesh"]["y_Ext"])
-
-            x_new = vec(s["mesh"]["x_Ext"])
-            y_new = vec(s["mesh"]["y_Ext"])
-
-            itp_rho = NaturalNeighbours.interpolate(x_old, y_old, vec(solution_old["var"]["rho"]))
-            s["var"]["rho"] = reshape(itp_rho(x_new, y_new; method=Triangle()), size(s["mesh"]["x_Ext"]))
-
-            itp_rho_u = NaturalNeighbours.interpolate(x_old, y_old, vec(solution_old["var"]["rho_u"]))
-            s["var"]["rho_u"] = reshape(itp_rho_u(x_new, y_new; method=Triangle()), size(s["mesh"]["x_Ext"]))
-
-            itp_rho_v = NaturalNeighbours.interpolate(x_old, y_old, vec(solution_old["var"]["rho_v"]))
-            s["var"]["rho_v"] = reshape(itp_rho_v(x_new, y_new; method=Triangle()), size(s["mesh"]["x_Ext"]))
-
-            itp_rho_E = NaturalNeighbours.interpolate(x_old, y_old, vec(solution_old["var"]["rho_E"]))
-            s["var"]["rho_E"] = reshape(itp_rho_E(x_new, y_new; method=Triangle()), size(s["mesh"]["x_Ext"]))
-
-            if !s["chemistry"]["chemical_equilibrium"]
-                itp_gamma = NaturalNeighbours.interpolate(x_old, y_old, vec(solution_old["var"]["gamma_star"]))
-                s["var"]["gamma_star"] = reshape(itp_gamma(x_new, y_new; method=Triangle()), size(s["mesh"]["x_Ext"]))
-
-                itp_cv = NaturalNeighbours.interpolate(x_old, y_old, vec(solution_old["var"]["cv_star"]))
-                s["var"]["cv_star"] = reshape(itp_cv(x_new, y_new; method=Triangle()), size(s["mesh"]["x_Ext"]))
-            end
-        end
-
-        ## Interpolate fields with shock (sub-shock cells only)
-        # Store only data from inner shock cells to avoid building an
-        # interpolant across the discontinuity.
-        if s["shock"]["enabled"]
-            x_temp = Float64[]
-            y_temp = Float64[]
-            temp_rho = Float64[]
-            temp_rho_u = Float64[]
-            temp_rho_v = Float64[]
-            temp_rho_E = Float64[]
-            temp_gamma_star = Float64[]
-            temp_cv_star = Float64[]
-
-            for i in 1:(solution_old["mesh"]["Nchi"] + 2)
-                if i > 1 && i < solution_old["mesh"]["Nchi"] + 2
-                    jmax = solution_old["shock"]["cell_indices"][i - 1, 1] + 2
-                elseif i == 1
-                    jmax = solution_old["shock"]["cell_indices"][1, 1] + 2
-                else
-                    jmax = solution_old["shock"]["cell_indices"][solution_old["mesh"]["Nchi"], 1] + 2
-                end
-
-                for j in 1:Int(jmax)
-                    push!(x_temp, solution_old["mesh"]["x_Ext"][i, j])
-                    push!(y_temp, solution_old["mesh"]["y_Ext"][i, j])
-                    push!(temp_rho, solution_old["var"]["rho"][i, j])
-                    push!(temp_rho_u, solution_old["var"]["rho_u"][i, j])
-                    push!(temp_rho_v, solution_old["var"]["rho_v"][i, j])
-                    push!(temp_rho_E, solution_old["var"]["rho_E"][i, j])
-                    if !s["chemistry"]["chemical_equilibrium"]
-                        push!(temp_gamma_star, solution_old["var"]["gamma_star"][i, j])
-                        push!(temp_cv_star, solution_old["var"]["cv_star"][i, j])
-                    end
-                end
-            end
-
-            ## Fit and evaluate interpolants on new mesh (Delaunay linear)
-            x_new = vec(s["mesh"]["x_Ext"])
-            y_new = vec(s["mesh"]["y_Ext"])
-
-            itp_rho = NaturalNeighbours.interpolate(x_temp, y_temp, temp_rho)
-            s["var"]["rho"] = reshape(itp_rho(x_new, y_new; method=Triangle()), size(s["mesh"]["x_Ext"]))
-
-            itp_rho_u = NaturalNeighbours.interpolate(x_temp, y_temp, temp_rho_u)
-            s["var"]["rho_u"] = reshape(itp_rho_u(x_new, y_new; method=Triangle()), size(s["mesh"]["x_Ext"]))
-
-            itp_rho_v = NaturalNeighbours.interpolate(x_temp, y_temp, temp_rho_v)
-            s["var"]["rho_v"] = reshape(itp_rho_v(x_new, y_new; method=Triangle()), size(s["mesh"]["x_Ext"]))
-
-            itp_rho_E = NaturalNeighbours.interpolate(x_temp, y_temp, temp_rho_E)
-            s["var"]["rho_E"] = reshape(itp_rho_E(x_new, y_new; method=Triangle()), size(s["mesh"]["x_Ext"]))
-
-            if !s["chemistry"]["chemical_equilibrium"]
-                itp_gamma = NaturalNeighbours.interpolate(x_temp, y_temp, temp_gamma_star)
-                s["var"]["gamma_star"] = reshape(itp_gamma(x_new, y_new; method=Triangle()), size(s["mesh"]["x_Ext"]))
-
-                itp_cv = NaturalNeighbours.interpolate(x_temp, y_temp, temp_cv_star)
-                s["var"]["cv_star"] = reshape(itp_cv(x_new, y_new; method=Triangle()), size(s["mesh"]["x_Ext"]))
-            end
-        end
+        ## Interpolate fields onto the new mesh (cubic, in the old grid index space)
+        s = REMESH_INTERPOLATION(s, solution_old)
 
         ## Update freestream and shock boundary conditions
         s = SET_FREESTREAM_PROPERTIES(s, chemistry)

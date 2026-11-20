@@ -18,9 +18,13 @@ function [s] = RESTART_SOLUTION(s, solution_old, chemistry, disturbances)
 %   Notes:
 %       - If Nx or Ny differ between old and new solutions, remeshing is
 %         triggered and all conserved fields are interpolated onto the new
-%         grid using linear interpolation.
-%       - When a shock is present, only data from inner (sub-shock) cells
-%         is used for interpolation to avoid smearing the discontinuity.
+%         grid (REMESH_INTERPOLATION: cubic interpolation along the old grid
+%         lines, smooth on stretched and curved meshes).
+%       - When a shock is present, only post-shock data is used for
+%         interpolation to avoid smearing the discontinuity.
+%       - A remesh moves the shock relative to the cells (it is re-centred
+%         in its row). The interpolated state is not a steady state of the
+%         new mesh: march further before linearizing about it.
 %       - After interpolation, boundary conditions, chemistry, and
 %         thermodynamic properties are recomputed on the new mesh.
 %       - If no remeshing is needed, the old s is copied directly.
@@ -63,76 +67,8 @@ function [s] = RESTART_SOLUTION(s, solution_old, chemistry, disturbances)
         s.time_integration.t = solution_old.time_integration.t;
         s = GENERATE_MESH(s, disturbances);
 
-        interp_method = "linear";
-
-        %% Interpolate fields without shock (full-domain griddata)
-        if ~s.shock.enabled
-            s.var.rho   = griddata(solution_old.mesh.x_Ext, solution_old.mesh.y_Ext, solution_old.var.rho, ...
-                s.mesh.x_Ext, s.mesh.y_Ext, interp_method);
-            s.var.rho_u = griddata(solution_old.mesh.x_Ext, solution_old.mesh.y_Ext, solution_old.var.rho_u, ...
-                s.mesh.x_Ext, s.mesh.y_Ext, interp_method);
-            s.var.rho_v = griddata(solution_old.mesh.x_Ext, solution_old.mesh.y_Ext, solution_old.var.rho_v, ...
-                s.mesh.x_Ext, s.mesh.y_Ext, interp_method);
-            s.var.rho_E = griddata(solution_old.mesh.x_Ext, solution_old.mesh.y_Ext, solution_old.var.rho_E, ...
-                s.mesh.x_Ext, s.mesh.y_Ext, interp_method);
-            if ~s.chemistry.chemical_equilibrium
-                s.var.gamma_star = griddata(solution_old.mesh.x_Ext, solution_old.mesh.y_Ext, solution_old.var.gamma_star, ...
-                    s.mesh.x_Ext, s.mesh.y_Ext, interp_method);
-                s.var.cv_star = griddata(solution_old.mesh.x_Ext, solution_old.mesh.y_Ext, solution_old.var.cv_star, ...
-                    s.mesh.x_Ext, s.mesh.y_Ext, interp_method);
-            end
-        end
-
-        %% Interpolate fields with shock (sub-shock cells only)
-        % Store only data from inner shock cells to avoid building an
-        % interpolant across the discontinuity.
-        if s.shock.enabled
-            count = 1;
-            for i = 1:solution_old.mesh.Nchi + 2
-                if i > 1 && i < solution_old.mesh.Nchi + 2
-                    jmax = solution_old.shock.cell_indices(i - 1, 1) + 2;
-                elseif i == 1
-                    jmax = solution_old.shock.cell_indices(1, 1) + 2;
-                else
-                    jmax = solution_old.shock.cell_indices(solution_old.mesh.Nchi, 1) + 2;
-                end
-
-                for j = 1:jmax
-                    x_temp(count)      = solution_old.mesh.x_Ext(i, j);
-                    y_temp(count)      = solution_old.mesh.y_Ext(i, j);
-                    temp_rho(count)    = solution_old.var.rho(i, j);
-                    temp_rho_u(count)  = solution_old.var.rho_u(i, j);
-                    temp_rho_v(count)  = solution_old.var.rho_v(i, j);
-                    temp_rho_E(count)  = solution_old.var.rho_E(i, j);
-                    if ~s.chemistry.chemical_equilibrium
-                        temp_gamma_star(count) = solution_old.var.gamma_star(i, j);
-                        temp_cv_star(count)    = solution_old.var.cv_star(i, j);
-                    end
-                    count = count + 1;
-                end
-            end
-
-            %% Fit and evaluate interpolants on new mesh
-            rho_I   = fit([x_temp(:), y_temp(:)], temp_rho(:), interp_method);
-            s.var.rho = rho_I(s.mesh.x_Ext, s.mesh.y_Ext);
-
-            rho_u_I = fit([x_temp(:), y_temp(:)], temp_rho_u(:), interp_method);
-            s.var.rho_u = rho_u_I(s.mesh.x_Ext, s.mesh.y_Ext);
-
-            rho_v_I = fit([x_temp(:), y_temp(:)], temp_rho_v(:), interp_method);
-            s.var.rho_v = rho_v_I(s.mesh.x_Ext, s.mesh.y_Ext);
-
-            rho_E_I = fit([x_temp(:), y_temp(:)], temp_rho_E(:), interp_method);
-            s.var.rho_E = rho_E_I(s.mesh.x_Ext, s.mesh.y_Ext);
-
-            if ~s.chemistry.chemical_equilibrium
-                gamma_star_I = fit([x_temp(:), y_temp(:)], temp_gamma_star(:), interp_method);
-                s.var.gamma_star = gamma_star_I(s.mesh.x_Ext, s.mesh.y_Ext);
-
-                cv_star_I = fit([x_temp(:), y_temp(:)], temp_cv_star(:), interp_method);
-                s.var.cv_star = cv_star_I(s.mesh.x_Ext, s.mesh.y_Ext);
-            end
-        end
+        %% Interpolate fields onto the new mesh (cubic, in the old grid index space)
+        s = REMESH_INTERPOLATION(s, solution_old);
 
         %% Update freestream and shock boundary conditions
         s = SET_FREESTREAM_PROPERTIES(s, chemistry);

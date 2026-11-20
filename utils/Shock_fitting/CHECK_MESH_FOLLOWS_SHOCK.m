@@ -23,6 +23,9 @@ function s = CHECK_MESH_FOLLOWS_SHOCK(s, chemistry)
 %       - A uniform shocked_cell_indices column is required for proper
 %         stability analysis on a shock-aligned grid.
 %       - When remeshing is triggered, disturbances are disabled (set to false).
+%       - Remeshing re-centres the shock in its row, which perturbs the base
+%         flow near the shock (residual jump); a warning is issued since the
+%         linearization is then about a non-converged state.
 %
 %   See also: RESTART_SOLUTION
 %
@@ -31,6 +34,9 @@ function s = CHECK_MESH_FOLLOWS_SHOCK(s, chemistry)
         for i = 1:s.mesh.Nchi
             if s.shock.cell_indices(i, 1) ~= s.shock.cell_indices(1, 1)
                 fprintf("\n Mesh not aligned with shock. Remesh for proper stability analysis. \n")
+                warning(['Remeshing the base flow before linearizing: the interpolated state is not ' ...
+                    'a steady state on the new mesh. For converged eigenvalues, march further with ' ...
+                    'remesh enabled until the mesh stays aligned with the shock.'])
                 solution_old = s;
                 disturbances = false;
                 s = RESTART_SOLUTION(s, solution_old, chemistry, disturbances);

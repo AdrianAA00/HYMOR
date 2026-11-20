@@ -27,8 +27,14 @@ using Printf
 #       - Stability analysis is temporarily disabled during the run and
 #         restored to its original flag value at the end.
 #       - Adaptive remeshing (RESTART_SOLUTION) is invoked only when
-#         s["shock"]["enabled"] and s["remesh"] are both true and one of
-#         three triggering conditions is met.
+#         s["shock"]["enabled"] and s["remesh"] are both true, and either the
+#         shock nears the top boundary or drifts refine_movement_cells rows
+#         (at once), or the mesh is no longer aligned with the shock (shocked
+#         cells in different rows) and refine_interval iterations have
+#         passed since the last remesh. An aligned mesh is never remeshed:
+#         each remesh re-centres the shock in its row, which perturbs the
+#         steady state, so near convergence the run settles on a fixed
+#         aligned mesh, as needed by LINEARIZE_L.
 #       - Running plots support single or multiple variables via the
 #         s["running_plot"]["variable"] field (string or cell array).
 #
@@ -68,7 +74,7 @@ function RUN_SIMULATION(s::Dict{String,Any}, solution_base::Dict{String,Any}, ch
     refine_interval               = 100
     refine_movement_cells         = 3
     s["index_refined"]     = s["shock"]["cell_indices"][1, 1]
-    s["last_refined_iter"] = -1
+    s["last_refined_iter"] = 0
 
     ## Declare solution_old in outer scope
     solution_old = Dict{String,Any}()
@@ -101,9 +107,10 @@ function RUN_SIMULATION(s::Dict{String,Any}, solution_base::Dict{String,Any}, ch
 
         # Adaptive mesh refinement when shock drifts or approaches boundary
         if s["shock"]["enabled"] && s["remesh"]
-            if (maximum(s["shock"]["cell_indices"][:, 1]) > s["mesh"]["Neta"] - 3) ||
-               (maximum(abs.(s["shock"]["cell_indices"][:, 1] .- s["index_refined"])) >= refine_movement_cells) ||
-               (mod(s["last_refined_iter"], refine_interval) == 0)
+            shock_rows = s["shock"]["cell_indices"][:, 1]
+            if (maximum(shock_rows) > s["mesh"]["Neta"] - 3) ||
+               (maximum(abs.(shock_rows .- s["index_refined"])) >= refine_movement_cells) ||
+               (any(shock_rows .!= shock_rows[1]) && i - s["last_refined_iter"] >= refine_interval)
 
                 s["last_refined_iter"] = i
                 s["restart"] = true
@@ -123,6 +130,10 @@ function RUN_SIMULATION(s::Dict{String,Any}, solution_base::Dict{String,Any}, ch
     ## Finalise s
     print("Final time = ")
     @printf("%.3f \n", s["time_integration"]["t"])
+
+    if s["shock"]["enabled"] && s["remesh"] && s["last_refined_iter"] > 0
+        @printf("Last remesh at iteration %i of %i.\n", s["last_refined_iter"], s["time_integration"]["N_iter"])
+    end
 
     if s["shock"]["enabled"]
         s = UPDATE_FLOW_CELLS(s, chemistry)
