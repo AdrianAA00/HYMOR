@@ -246,6 +246,15 @@ function s = UPDATE_SHOCK_JUMP_PROPERTIES_RIEMANN(s, chemistry)
         s.var.cv_star(idx_0) = -slope_cv_star .* dist0s + cv_s;
     end
 
+    %% Azimuthal momentum of an azimuthal mode
+    if isfield(s, 'azimuthal')
+        rho_w_s = AZIMUTHAL_MOMENTUM_SHOCK(s, rho_s, rho_inf, normal_velocity_inf - normal_velocity_s);
+        rho_w_1 = s.var.rho_w(sub2ind(size(s.var.rho_w), valid_ix + 1, sc_idy + 1 - 1));
+        rho_w_2 = s.var.rho_w(sub2ind(size(s.var.rho_w), valid_ix + 1, sc_idy + 1 - 2));
+        slope_rho_w = (rho_w_1 - rho_w_2) ./ dist12;
+        s.var.rho_w(idx_0) = -slope_rho_w .* dist0s + rho_w_s;
+    end
+
     %% Extrapolate to ghost cells
     s = EXTRAPOLATE_CELLS_SHOCK(s);
 end
@@ -490,144 +499,4 @@ function rho_w_s = AZIMUTHAL_MOMENTUM_SHOCK(s, rho_s, rho_inf, jump_normal_veloc
     end
     w_s = w_inf - jump_normal_velocity .* s.azimuthal.m ./ s.shock.points_y .* eta;
     rho_w_s = rho_s .* w_s;
-end
-
-%% ========================================================================
-%  Mach-Number-Based Pressure Solver (Legacy)
-%  ========================================================================
-function s = UPDATE_SHOCK_JUMP_PROPERTIES_PRESSURE(s)
-% UPDATE_SHOCK_JUMP_PROPERTIES_PRESSURE  Legacy solver using Mach-number-
-%   based pressure jump for shock fitting with or without shock feedback.
-
-    if s.shock.feedback
-        %% Precompute factors
-        gamma = s.freestream.gamma;
-        factor_M = (gamma + 1) ./ (2 * gamma);
-        factor_add = (gamma - 1) ./ (2 * gamma);
-        shock_diff_factor = s.mesh.Nchi^2 / s.Re_shock;
-
-        [p_infty, u_inf, v_inf, rho_inf, e_inf] = COMPUTE_UPSTREAM_CONDITIONS(s);
-        a_s_inf = sqrt(s.freestream.gamma * p_infty ./ rho_inf);
-        u_mag = sqrt(v_inf.^2 + u_inf.^2);
-        Mach_inf = u_mag ./ a_s_inf;
-
-        %% Index computation for shocked cells
-        valid_ix = (1:s.mesh.Nchi)';
-        sc_idy = s.shock.cell_indices(valid_ix, 1);
-
-        lin_idx_0 = sub2ind(size(s.mesh.x), valid_ix, sc_idy);
-        lin_idx_1 = sub2ind(size(s.mesh.x), valid_ix, sc_idy - 1);
-        lin_idx_2 = sub2ind(size(s.mesh.x), valid_ix, sc_idy - 2);
-
-        x_0 = s.mesh.x(lin_idx_0);
-        y_0 = s.mesh.y(lin_idx_0);
-        x_1 = s.mesh.x(lin_idx_1);
-        y_1 = s.mesh.y(lin_idx_1);
-        x_2 = s.mesh.x(lin_idx_2);
-        y_2 = s.mesh.y(lin_idx_2);
-        x_s = s.shock.points_x(valid_ix);
-        y_s = s.shock.points_y(valid_ix);
-
-        %% Distance computation
-        dist01 = sqrt((x_0 - x_1).^2 + (y_0 - y_1).^2);
-        dist12 = sqrt((x_1 - x_2).^2 + (y_1 - y_2).^2);
-        dist1s = ((x_s - x_1).*(x_1 - x_2) + (y_s - y_1).*(y_1 - y_2)) ./ dist12;
-        dist0s = ((x_s - x_0).*(x_0 - x_1) + (y_s - y_0).*(y_0 - y_1)) ./ dist01;
-
-        %% Pressure interpolation
-        p_1 = s.var.p(sub2ind(size(s.var.p), valid_ix + 1, sc_idy + 1 - 1));
-        p_2 = s.var.p(sub2ind(size(s.var.p), valid_ix + 1, sc_idy + 1 - 2));
-        slope_p = (p_1 - p_2) ./ dist12;
-        p_s = slope_p .* dist1s + p_1;
-
-        %% Flow field gradients
-        rho_1 = s.var.rho(sub2ind(size(s.var.rho), valid_ix + 1, sc_idy + 1 - 1));
-        rho_2 = s.var.rho(sub2ind(size(s.var.rho), valid_ix + 1, sc_idy + 1 - 2));
-        slope_rho = (rho_1 - rho_2) ./ dist12;
-
-        rho_u_1 = s.var.rho_u(sub2ind(size(s.var.rho_u), valid_ix + 1, sc_idy + 1 - 1));
-        rho_u_2 = s.var.rho_u(sub2ind(size(s.var.rho_u), valid_ix + 1, sc_idy + 1 - 2));
-        slope_rho_u = (rho_u_1 - rho_u_2) ./ dist12;
-
-        rho_v_1 = s.var.rho_v(sub2ind(size(s.var.rho_v), valid_ix + 1, sc_idy + 1 - 1));
-        rho_v_2 = s.var.rho_v(sub2ind(size(s.var.rho_v), valid_ix + 1, sc_idy + 1 - 2));
-        slope_rho_v = (rho_v_1 - rho_v_2) ./ dist12;
-
-        rho_E_1 = s.var.rho_E(sub2ind(size(s.var.rho_E), valid_ix + 1, sc_idy + 1 - 1));
-        rho_E_2 = s.var.rho_E(sub2ind(size(s.var.rho_E), valid_ix + 1, sc_idy + 1 - 2));
-        slope_rho_E = (rho_E_1 - rho_E_2) ./ dist12;
-
-        %% Shock Mach number and velocity
-        s.shock.M = real(sqrt(p_s ./ p_infty .* factor_M + factor_add));
-        if any(s.shock.M < 1)
-            warning('ERROR: Mach number less than 1');
-            warning('Add smoothing to shock and increase viscosity_scaling');
-            keyboard
-        end
-
-        ang = s.shock.beta(valid_ix, 1) - atan2(v_inf, u_inf);
-        s.shock.relative_increase_velocity = (s.shock.M - sin(ang) .* Mach_inf) .* a_s_inf;
-
-        %% Shock speed in grid coordinates
-        if strcmp(s.shock.formulation, "Lagrangian")
-            s.shock.speed_x = -s.shock.relative_increase_velocity .* sin(s.shock.beta);
-            s.shock.speed_y = s.shock.relative_increase_velocity .* cos(s.shock.beta);
-        elseif strcmp(s.shock.formulation, "Eulerian")
-            s.shock.speed_x = -s.shock.relative_increase_velocity .* sin(s.shock.beta);
-            s.shock.speed_y = s.shock.relative_increase_velocity .* cos(s.shock.beta);
-            s.shock.speed_x = s.shock.speed_x - s.shock.speed_y .* tan(pi/2 - s.shock.beta);
-            s.shock.speed_y = zeros(size(s.shock.relative_increase_velocity));
-        end
-
-        %% Conservative variable reconstruction (supersonic cells only)
-        valid_ix = find(s.shock.M(:, 1) > 1);
-
-        if ~isempty(valid_ix)
-            M = s.shock.M(valid_ix, 1);
-            rho_s = (gamma + 1) .* M.^2 ./ ((gamma - 1) .* M.^2 + 2) .* rho_inf;
-
-            tangential_velocity = cos(ang(valid_ix, 1)) .* sqrt(u_inf.^2 + v_inf.^2);
-            normal_velocity = (M .* a_s_inf) .* (rho_inf ./ rho_s);
-
-            shock_speed_x = s.shock.speed_x(valid_ix, 1);
-            shock_speed_y = s.shock.speed_y(valid_ix, 1);
-            rho_u_s = rho_s .* (normal_velocity .* sin(s.shock.beta(valid_ix, 1)) ...
-                + tangential_velocity .* cos(s.shock.beta(valid_ix, 1)) + shock_speed_x);
-            rho_v_s = rho_s .* (-normal_velocity .* cos(s.shock.beta(valid_ix, 1)) ...
-                + tangential_velocity .* sin(s.shock.beta(valid_ix, 1)) + shock_speed_y);
-
-            rho_E_s = p_s ./ (gamma - 1) + (rho_u_s.^2 + rho_v_s.^2) ./ (2 * rho_s);
-
-            % Store properties
-            s.shock.properties.rho = rho_s;
-            s.shock.properties.rho_u = rho_u_s;
-            s.shock.properties.rho_v = rho_v_s;
-            s.shock.properties.rho_E = rho_E_s;
-            s.shock.properties.p = p_s;
-            s.shock.properties.gamma_star = gamma_s;
-            s.shock.properties.cv_star = cv_s;
-
-            % Update shocked cells via linear interpolation
-            idx_0 = sub2ind(size(s.var.rho), valid_ix + 1, sc_idy + 1);
-
-            s.var.rho(idx_0) = -slope_rho .* dist0s + rho_s;
-            s.var.rho_u(idx_0) = -slope_rho_u .* dist0s + rho_u_s;
-            s.var.rho_v(idx_0) = -slope_rho_v .* dist0s + rho_v_s;
-            s.var.rho_E(idx_0) = -slope_rho_E .* dist0s + rho_E_s;
-            s.var.p(idx_0) = -slope_p .* dist0s + p_s;
-        end
-    else
-        %% Passive shock (no feedback) -- simple extrapolation
-        valid_ix = (1:s.mesh.Nchi)';
-        sc_idy = s.shock.cell_indices(valid_ix, 1);
-
-        idx_0 = sub2ind(size(s.var.rho_E), valid_ix + 1, sc_idy + 1);
-        idx_1 = sub2ind(size(s.var.rho_E), valid_ix + 1, sc_idy + 1 - 1);
-        idx_2 = sub2ind(size(s.var.rho_E), valid_ix + 1, sc_idy + 1 - 2);
-
-        s.var.rho_E(idx_0) = 2 * s.var.rho_E(idx_1) - s.var.rho_E(idx_2);
-    end
-
-    %% Extrapolate to ghost cells
-    s = EXTRAPOLATE_CELLS_SHOCK(s);
 end

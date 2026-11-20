@@ -53,6 +53,7 @@ function [s, L] = LINEARIZE_L(s, chemistry)
     %% Prepare base flow
     if s.shock.enabled
         s = CHECK_MESH_FOLLOWS_SHOCK(s, chemistry);
+        s.linearize = true;   % a remesh (RESTART_SOLUTION) resets it; PDE needs it for the azimuthal terms
     end
     s = UPDATE_CHEMISTRY_EQUILIBRIUM(s, chemistry);
 

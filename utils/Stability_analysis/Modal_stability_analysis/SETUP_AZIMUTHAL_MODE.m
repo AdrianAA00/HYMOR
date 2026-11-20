@@ -37,7 +37,7 @@ function s = SETUP_AZIMUTHAL_MODE(s, chemistry)
         'stability_analysis.azimuthal_wavenumber requires PDE_dimension = "3D-axisymmetric"');
     assert(isscalar(m) && m >= 0 && m == round(m), ...
         'stability_analysis.azimuthal_wavenumber must be a non-negative integer');
-    assert(all(s.mesh.y_corner >= 0, 'all'), 'Azimuthal modes need the domain at y >= 0 (y = r)');
+    assert(all(s.mesh.y_corner >= -AXIS_TOLERANCE(s), 'all'), 'Azimuthal modes need the domain at y >= 0 (y = r)');
 
     %% Base flow after the same state update as the linearization
     s_base = NON_LINEAR_DYNAMICS_NO_DISCONTINUITY(UPDATE_CHEMISTRY_EQUILIBRIUM(s, chemistry), chemistry);
@@ -70,7 +70,7 @@ end
 function names = AXIS_BOUNDARIES(s)
 % AXIS_BOUNDARIES  Symmetry boundaries whose faces all lie on r = 0.
     y = s.mesh.y_corner;
-    tol = 1e-10 * max(abs(y), [], 'all');
+    tol = AXIS_TOLERANCE(s);
     lines = struct('chi0', y(1, :), 'chi1', y(end, :), 'eta0', y(:, 1), 'eta1', y(:, end));
     names = strings(1, 0);
     for b = ["chi0", "chi1", "eta0", "eta1"]
@@ -78,4 +78,13 @@ function names = AXIS_BOUNDARIES(s)
             names(end+1) = b; %#ok<AGROW>
         end
     end
+end
+
+function tol = AXIS_TOLERANCE(s)
+% AXIS_TOLERANCE  Distance from r = 0 still counted as on the axis.
+%   Shock-fitted meshes do not place the axis exactly at y = 0: the shock
+%   spline leaves the axis end of the shock at y ~ 1e-8 R and the wall
+%   corner at -1e-16. 1e-6 of the domain size is far above that and far
+%   below any distance between the axis and a non-axis boundary.
+    tol = 1e-6 * max(abs(s.mesh.y_corner), [], 'all');
 end
